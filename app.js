@@ -157,6 +157,8 @@
   var backBtn = $("back-btn");
   var printBtn = $("print-btn");
   var fitWarning = $("fit-warning");
+  var scrollHint = $("scroll-hint");
+  var paperWrap = $("paper-wrap");
 
   var letterMain = $("letter-main");
   var letterDate = $("letter-date");
@@ -467,8 +469,22 @@
       // mistaken for text that doesn't fit on the printed page itself.
       var overflowing = letterPage.scrollWidth > letterPage.clientWidth + 2;
       fitWarning.hidden = !overflowing;
+
+      // The letter-page has a fixed A4 width, so on a narrow phone screen
+      // the preview box itself needs horizontal scrolling even when the
+      // text fits the page perfectly. Let students know they can scroll.
+      if (paperWrap) {
+        var needsScroll = letterPage.scrollWidth > paperWrap.clientWidth + 2;
+        scrollHint.hidden = !needsScroll;
+      }
     });
   }
+
+  window.addEventListener("resize", function () {
+    if (document.body.getAttribute("data-screen") === "2") {
+      checkFit();
+    }
+  });
 
   /* ---------------- 初期化 ---------------- */
 
