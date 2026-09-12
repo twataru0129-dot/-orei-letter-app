@@ -1,0 +1,614 @@
+/* ==========================================================
+   お礼状作成サポート - styles.css
+   ========================================================== */
+
+:root {
+  --color-1: #ffe1ea; /* ①頭語 淡いピンク */
+  --color-1-border: #f3a9c2;
+  --color-2: #ffe8d1; /* ②時候の挨拶 淡いオレンジ */
+  --color-2-border: #f0b985;
+  --color-3: #fff8cc; /* ③お礼 淡い黄色 */
+  --color-3-border: #e6cf6b;
+  --color-4: #e0f5df; /* ④具体的な出来事 淡い緑 */
+  --color-4-border: #98cf95;
+  --color-5: #d9f4f5; /* ⑤心に残ったこと 淡い水色 */
+  --color-5-border: #7fc9cd;
+  --color-6: #dbe7fb; /* ⑥これから 淡い青 */
+  --color-6-border: #8fb3e8;
+  --color-7: #ebe0fa; /* ⑦結びの挨拶 淡い紫 */
+  --color-7-border: #b79ce6;
+  --color-8: #ffe3ef; /* ⑧結語 淡いピンク系 */
+  --color-8-border: #ec9dbe;
+
+  --text-main: #2b2b2b;
+  --text-sub: #5a5a5a;
+  --border-soft: #d8d8d8;
+  --bg-page: #f7f6f3;
+  --accent: #2f6f5e;
+  --accent-dark: #1f4d40;
+  --error-bg: #fdecec;
+  --error-border: #d96b6b;
+  --error-text: #8a2626;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", "YuGothic",
+    "Meiryo", "Noto Sans CJK JP", "Noto Sans JP", sans-serif;
+  background: var(--bg-page);
+  color: var(--text-main);
+  font-size: 17px;
+  line-height: 1.7;
+  -webkit-text-size-adjust: 100%;
+}
+
+.app {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 0 40px;
+}
+
+/* ---------------- Header / Progress ---------------- */
+
+.app-header {
+  background: #ffffff;
+  border-bottom: 3px solid var(--accent);
+  padding: 16px 20px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.app-title {
+  margin: 0 0 12px;
+  font-size: 1.4rem;
+  color: var(--accent-dark);
+  text-align: center;
+}
+
+.progress {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.progress-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: #eee;
+  color: var(--text-sub);
+  font-weight: bold;
+  font-size: 0.95rem;
+  border: 2px solid #ddd;
+}
+
+.progress-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #ccc;
+  color: #fff;
+  font-size: 0.85rem;
+}
+
+.progress-step.current {
+  background: #eaf6f1;
+  border-color: var(--accent);
+  color: var(--accent-dark);
+}
+
+.progress-step.current .progress-num {
+  background: var(--accent);
+}
+
+.progress-step.done {
+  background: #f0f4f2;
+  border-color: #9fc4b6;
+  color: var(--accent-dark);
+}
+
+.progress-step.done .progress-num {
+  background: #9fc4b6;
+}
+
+.progress-arrow {
+  color: var(--text-sub);
+  font-size: 1.1rem;
+}
+
+/* ---------------- Screens ---------------- */
+
+.screen {
+  display: none;
+  padding: 20px;
+}
+
+body[data-screen="1"] .screen1 {
+  display: block;
+}
+
+body[data-screen="2"] .screen2 {
+  display: block;
+}
+
+.screen-inner {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.screen-title {
+  font-size: 1.6rem;
+  color: var(--accent-dark);
+  margin: 16px 0 6px;
+}
+
+.screen-lead {
+  font-size: 1.1rem;
+  color: var(--text-sub);
+  margin: 0;
+}
+
+/* ---------------- Worksheet items ---------------- */
+
+.worksheet {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.item {
+  border-radius: 14px;
+  border: 2px solid var(--border-soft);
+  padding: 16px 18px 18px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.item-1, .item-8 { background: var(--color-1); border-color: var(--color-1-border); }
+.item-2 { background: var(--color-2); border-color: var(--color-2-border); }
+.item-3 { background: var(--color-3); border-color: var(--color-3-border); }
+.item-4 { background: var(--color-4); border-color: var(--color-4-border); }
+.item-5 { background: var(--color-5); border-color: var(--color-5-border); }
+.item-6 { background: var(--color-6); border-color: var(--color-6-border); }
+.item-7 { background: var(--color-7); border-color: var(--color-7-border); }
+.item-8 { background: var(--color-8); border-color: var(--color-8-border); }
+
+.item-label {
+  font-size: 1.15rem;
+  font-weight: bold;
+  color: var(--text-main);
+  margin-bottom: 6px;
+}
+
+.item-desc {
+  font-size: 0.98rem;
+  color: var(--text-sub);
+  margin-bottom: 10px;
+}
+
+.item-note {
+  font-size: 0.9rem;
+  color: var(--text-sub);
+  margin: 8px 0 0;
+}
+
+.fixed-text {
+  background: #ffffffcc;
+  border: 1px dashed #bbb;
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 1.1rem;
+}
+
+/* ---------------- Month select ---------------- */
+
+.month-select-label {
+  display: block;
+  font-weight: bold;
+  margin-bottom: 6px;
+}
+
+.month-select {
+  font-size: 1.1rem;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 2px solid #aaa;
+  background: #fff;
+  width: 100%;
+  max-width: 280px;
+  min-height: 48px;
+}
+
+/* ---------------- Greeting cards ---------------- */
+
+.greeting-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+@media (max-width: 560px) {
+  .greeting-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+.greeting-card {
+  text-align: left;
+  background: #ffffff;
+  border: 2px solid #ccc;
+  border-radius: 12px;
+  padding: 14px;
+  font-size: 1.02rem;
+  line-height: 1.6;
+  cursor: pointer;
+  color: var(--text-main);
+  font-family: inherit;
+  min-height: 88px;
+  transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
+}
+
+.greeting-card:hover {
+  border-color: var(--accent);
+}
+
+.greeting-card:active {
+  transform: translateY(1px);
+}
+
+.greeting-card-part {
+  display: inline-block;
+  font-weight: bold;
+  font-size: 0.9rem;
+  color: #fff;
+  background: #999;
+  border-radius: 999px;
+  padding: 2px 10px;
+  margin-bottom: 8px;
+}
+
+.greeting-card.selected {
+  border-color: var(--accent);
+  border-width: 3px;
+  background: #eaf6f1;
+  box-shadow: 0 0 0 3px rgba(47, 111, 94, 0.2);
+}
+
+.greeting-card.selected .greeting-card-part {
+  background: var(--accent);
+}
+
+.greeting-card.selected::before {
+  content: "選択中";
+  display: block;
+  font-size: 0.85rem;
+  font-weight: bold;
+  color: var(--accent-dark);
+  margin-bottom: 4px;
+}
+
+.selected-preview {
+  margin-top: 12px;
+  font-size: 0.95rem;
+  color: var(--text-sub);
+  min-height: 1.4em;
+}
+
+/* ---------------- Sentence rows (④⑤) ---------------- */
+
+.sentence-row {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sentence-row-wrap .fixed-fragment:last-child {
+  flex-basis: 100%;
+}
+
+.fixed-fragment {
+  background: #ffffffcc;
+  border: 1px dashed #bbb;
+  border-radius: 8px;
+  padding: 10px 10px;
+  font-size: 1.05rem;
+  white-space: nowrap;
+}
+
+textarea {
+  flex: 1 1 220px;
+  min-width: 200px;
+  font-size: 1.05rem;
+  font-family: inherit;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 2px solid #aaa;
+  resize: vertical;
+  line-height: 1.6;
+}
+
+textarea:focus, .month-select:focus, input:focus, select:focus {
+  outline: 3px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* ---------------- Buttons ---------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 56px;
+  padding: 12px 28px;
+  font-size: 1.15rem;
+  font-weight: bold;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  transition: filter 0.15s, transform 0.05s;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn-large {
+  min-width: 220px;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.btn-primary:hover {
+  filter: brightness(1.08);
+}
+
+.btn-secondary {
+  background: #fff;
+  color: var(--accent-dark);
+  border: 2px solid var(--accent);
+}
+
+.btn-secondary:hover {
+  background: #eaf6f1;
+}
+
+.worksheet-footer {
+  margin-top: 26px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+/* ---------------- Error box ---------------- */
+
+.error-box {
+  width: 100%;
+  max-width: 640px;
+  background: var(--error-bg);
+  border: 2px solid var(--error-border);
+  color: var(--error-text);
+  border-radius: 12px;
+  padding: 14px 18px;
+  font-size: 1rem;
+}
+
+.error-box p {
+  margin: 0 0 6px;
+  font-weight: bold;
+}
+
+.error-box ul {
+  margin: 0;
+  padding-left: 1.4em;
+}
+
+.error-box li {
+  margin-bottom: 4px;
+}
+
+/* ---------------- Letter form (screen 2) ---------------- */
+
+.letter-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  max-width: 720px;
+  margin: 0 auto 20px;
+}
+
+@media (max-width: 560px) {
+  .letter-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+.form-row label {
+  display: block;
+  font-weight: bold;
+  margin-bottom: 6px;
+}
+
+.required {
+  background: #d9534f;
+  color: #fff;
+  font-size: 0.75rem;
+  border-radius: 6px;
+  padding: 2px 6px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.form-row input,
+.form-row select {
+  width: 100%;
+  font-size: 1.05rem;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 2px solid #aaa;
+  min-height: 48px;
+  background: #fff;
+}
+
+.form-hint {
+  font-size: 0.85rem;
+  color: var(--text-sub);
+  margin: 6px 0 0;
+}
+
+.fit-warning {
+  max-width: 720px;
+  margin: 0 auto 16px;
+  background: #fff6e0;
+  border: 2px solid #e6c469;
+  color: #7a5b00;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 0.95rem;
+  text-align: center;
+}
+
+/* ---------------- Letter paper (vertical writing) ---------------- */
+
+.paper-wrap {
+  display: flex;
+  justify-content: center;
+  overflow-x: auto;
+  padding: 10px 0 20px;
+}
+
+.letter-page {
+  background: #fffdf8;
+  border: 1px solid #ccc;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+  width: 186mm;
+  height: 273mm;
+  max-width: none;
+  flex: 0 0 auto;
+  padding: 10mm 8mm;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-size: 15.5px;
+  line-height: 1.95;
+  letter-spacing: 0.02em;
+  color: #1a1a1a;
+}
+
+.letter-main {
+  padding-top: 0;
+}
+
+.letter-closing {
+  margin-top: 3.5em;
+}
+
+.letter-date {
+  margin-top: 3em;
+}
+
+.letter-sender {
+  margin-top: 1em;
+}
+
+.letter-school {
+  margin-top: 1.2em;
+}
+
+.letter-dept-grade {
+  margin-top: 0.6em;
+}
+
+.letter-name {
+  margin-top: 0.6em;
+  font-size: 1.05em;
+}
+
+.letter-recipient {
+  font-size: 1.25em;
+  margin-top: 0;
+  font-weight: bold;
+}
+
+/* ---------------- Letter actions ---------------- */
+
+.letter-actions {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+}
+
+/* ==========================================================
+   Print styles
+   ========================================================== */
+
+@page {
+  size: A4 portrait;
+  margin: 10mm;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body[data-screen] .screen1 {
+    display: none !important;
+  }
+
+  body[data-screen] .screen2 {
+    display: block !important;
+  }
+
+  .app-header,
+  .app {
+    padding: 0;
+    margin: 0;
+    max-width: none;
+  }
+
+  main {
+    padding: 0;
+  }
+
+  .screen2 {
+    padding: 0;
+  }
+
+  .paper-wrap {
+    padding: 0;
+    overflow: visible;
+  }
+
+  .letter-page {
+    width: 100%;
+    height: auto;
+    min-height: calc(297mm - 20mm);
+    max-height: calc(297mm - 20mm);
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    overflow: hidden;
+  }
+}
