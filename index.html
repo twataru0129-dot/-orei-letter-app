@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>お礼状作成サポート</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body data-screen="1">
+<div class="app">
+
+  <header class="app-header no-print">
+    <h1 class="app-title">お礼状作成サポート</h1>
+    <div class="progress" id="progress">
+      <div class="progress-step" id="step-1" data-step="1">
+        <span class="progress-num">1</span>
+        <span class="progress-text">ワークシート</span>
+      </div>
+      <div class="progress-arrow" aria-hidden="true">→</div>
+      <div class="progress-step" id="step-2" data-step="2">
+        <span class="progress-num">2</span>
+        <span class="progress-text">清書</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ============ 画面1：ワークシート ============ -->
+    <section id="screen1" class="screen screen1">
+
+      <div class="screen-inner no-print">
+        <h2 class="screen-title">お礼状を完成させよう</h2>
+        <p class="screen-lead">①から⑧まで、順番に完成させよう！</p>
+      </div>
+
+      <div class="worksheet no-print">
+
+        <!-- ① 頭語 -->
+        <div class="item item-1">
+          <div class="item-label">① 頭語（拝啓）</div>
+          <div class="item-body">
+            <div class="fixed-text">拝啓</div>
+            <p class="item-note">ここは変更できません。</p>
+          </div>
+        </div>
+
+        <!-- ② 時候の挨拶 -->
+        <div class="item item-2">
+          <div class="item-label">② 時候の挨拶</div>
+          <div class="item-desc">今の月を選んで、前半・後半から文章を選ぼう</div>
+          <div class="item-body">
+            <label class="month-select-label" for="month-select-2">月を選ぶ</label>
+            <select id="month-select-2" class="month-select"></select>
+            <div id="cards-2" class="greeting-cards"></div>
+            <p class="selected-preview" id="selected-preview-2"></p>
+          </div>
+        </div>
+
+        <!-- ③ お礼 -->
+        <div class="item item-3">
+          <div class="item-label">③ お礼</div>
+          <div class="item-body">
+            <div class="fixed-text">先日は、現場実習で大変お世話になり、ありがとうございました。</div>
+            <p class="item-note">ここは変更できません。</p>
+          </div>
+        </div>
+
+        <!-- ④ 具体的な出来事 -->
+        <div class="item item-4">
+          <div class="item-label">④ 具体的な出来事</div>
+          <div class="item-desc">実習で取り組んだ仕事や、印象に残った出来事を書こう</div>
+          <div class="item-body">
+            <div class="sentence-row">
+              <span class="fixed-fragment">実習では、</span>
+              <textarea id="input-4" rows="3" placeholder="（例）商品の品出しや、棚の整理をしました。"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- ⑤ 心に残ったこと／学んだこと -->
+        <div class="item item-5">
+          <div class="item-label">⑤ 心に残ったこと／学んだこと</div>
+          <div class="item-desc">実習を通して気付いたことや、学んだことを書こう</div>
+          <div class="item-body">
+            <div class="sentence-row sentence-row-wrap">
+              <span class="fixed-fragment">今回の実習を通して、</span>
+              <textarea id="input-5" rows="3" placeholder="（例）仕事では周りの人と協力することが大切だという"></textarea>
+              <span class="fixed-fragment">ことを学びました。</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ⑥ これから -->
+        <div class="item item-6">
+          <div class="item-label">⑥ これから</div>
+          <div class="item-body">
+            <div class="fixed-text">今回学んだことを、これからの学校生活にも生かしていきたいと思います。</div>
+            <p class="item-note">ここは変更できません。</p>
+          </div>
+        </div>
+
+        <!-- ⑦ 結びの挨拶 -->
+        <div class="item item-7">
+          <div class="item-label">⑦ 結びの挨拶</div>
+          <div class="item-desc">今の月を選んで、前半・後半から文章を選ぼう</div>
+          <div class="item-body">
+            <label class="month-select-label" for="month-select-7">月を選ぶ</label>
+            <select id="month-select-7" class="month-select"></select>
+            <div id="cards-7" class="greeting-cards"></div>
+            <p class="selected-preview" id="selected-preview-7"></p>
+          </div>
+        </div>
+
+        <!-- ⑧ 結語 -->
+        <div class="item item-8">
+          <div class="item-label">⑧ 結語</div>
+          <div class="item-body">
+            <div class="fixed-text">敬具</div>
+            <p class="item-note">ここは変更できません。</p>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="worksheet-footer no-print">
+        <div id="error-box" class="error-box" hidden></div>
+        <button id="complete-btn" type="button" class="btn btn-primary btn-large">作成完了</button>
+      </div>
+
+    </section>
+
+    <!-- ============ 画面2：清書用便箋 ============ -->
+    <section id="screen2" class="screen screen2">
+
+      <div class="screen-inner no-print">
+        <h2 class="screen-title">お礼状を清書しよう</h2>
+        <p class="screen-lead">内容を確認して、印刷しましょう。</p>
+      </div>
+
+      <div class="letter-form no-print">
+        <div class="form-row">
+          <label for="input-company">実習先の会社名 <span class="required">必須</span></label>
+          <input type="text" id="input-company" placeholder="（例）ワタキューセイモア株式会社">
+          <p class="form-hint">清書では自動的に「御中」が付きます。</p>
+        </div>
+        <div class="form-row">
+          <label for="input-date">日付</label>
+          <input type="date" id="input-date">
+        </div>
+        <div class="form-row">
+          <label for="input-grade">学年</label>
+          <select id="input-grade">
+            <option value="1">1年</option>
+            <option value="2">2年</option>
+            <option value="3">3年</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label for="input-name">名前</label>
+          <input type="text" id="input-name" placeholder="（例）埼玉　太郎">
+        </div>
+      </div>
+
+      <div id="fit-warning" class="fit-warning no-print" hidden>
+        文章が長いため、便箋からはみ出す場合があります。④や⑤の文章を短くすると収まりやすくなります。
+      </div>
+
+      <p id="scroll-hint" class="scroll-hint no-print" hidden>← 横にスクロールすると、便箋全体を確認できます →</p>
+
+      <div class="paper-wrap" id="paper-wrap">
+        <div class="letter-page" id="letter-page">
+          <div class="letter-main" id="letter-main"></div>
+          <div class="letter-closing">敬具</div>
+          <div class="letter-date" id="letter-date"></div>
+          <div class="letter-sender">
+            <div class="letter-school">さいたま桜高等学園</div>
+            <div class="letter-dept-grade" id="letter-dept-grade"></div>
+            <div class="letter-name" id="letter-name"></div>
+          </div>
+          <div class="letter-recipient" id="letter-recipient"></div>
+        </div>
+      </div>
+
+      <div class="letter-actions no-print">
+        <button id="back-btn" type="button" class="btn btn-secondary btn-large">もどって直す</button>
+        <button id="print-btn" type="button" class="btn btn-primary btn-large">印刷する</button>
+      </div>
+
+    </section>
+
+  </main>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
