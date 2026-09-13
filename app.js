@@ -377,9 +377,37 @@
     renderLetter();
   });
 
-  /* ---------------- 令和変換 ---------------- */
+  /* ---------------- 令和変換（漢数字） ---------------- */
 
-  function toReiwaString(isoDateStr) {
+  var KANJI_DIGITS = ["", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
+  var KANJI_UNITS = ["", "十", "百", "千"];
+
+  // 単純な数字の置き換えではなく、「十二」「二十一」のような
+  // 日本語として自然な漢数字表記に変換する（1〜9999程度を想定）。
+  function numberToKanji(num) {
+    if (num === 0) {
+      return "〇";
+    }
+    var s = String(num);
+    var len = s.length;
+    var result = "";
+    for (var i = 0; i < len; i++) {
+      var d = Number(s[i]);
+      var unitIndex = len - i - 1;
+      if (d === 0) {
+        continue;
+      }
+      if (d === 1 && unitIndex > 0) {
+        // 「一十」ではなく「十」、「一百」ではなく「百」とする
+        result += KANJI_UNITS[unitIndex];
+      } else {
+        result += KANJI_DIGITS[d] + KANJI_UNITS[unitIndex];
+      }
+    }
+    return result;
+  }
+
+  function reiwaKanjiDate(isoDateStr) {
     if (!isoDateStr) {
       return "";
     }
@@ -397,19 +425,57 @@
     var reiwaStart = new Date(2019, 4, 1); // 2019-05-01
     var target = new Date(year, month - 1, day);
 
-    var text;
+    var yearText;
     if (target.getTime() >= reiwaStart.getTime()) {
       var reiwaYear = year - 2018;
-      text = "令和" + (reiwaYear === 1 ? "元" : String(reiwaYear)) + "年";
+      yearText = "令和" + (reiwaYear === 1 ? "元" : numberToKanji(reiwaYear)) + "年";
     } else {
-      text = String(year) + "年";
+      // 令和より前の日付が選ばれた場合の保険（通常は発生しない）
+      yearText = numberToKanji(year) + "年";
     }
-    text += String(month) + "月" + String(day) + "日";
 
-    return document.createTextNode(text);
+    return yearText + numberToKanji(month) + "月" + numberToKanji(day) + "日";
   }
 
-  /* ---------------- 清書便箋の描画 ---------------- */
+  /* ---------------- 清書便箋のレイアウト計算 ----------------
+     A4の紙面に、1列およそ20〜25文字の縦書き便箋らしい列で
+     文章を配置するため、内容の文字数から列数を見積もり、
+     紙面の横幅に収まるように文字サイズ（＝列の間隔）を
+     自動調整する。最小文字サイズは下回らない。 */
+
+  var LAYOUT = {
+    charsPerColumn: 24, // 1列あたりの目安文字数（20〜25の範囲）
+    pitchFactor: 1.7, // 列の間隔 = 文字サイズ × この倍率
+    heightBuffer: 1.08, // 1列の高さ = 文字サイズ × 文字数 × この倍率
+    fontMaxMm: 7.5, // 文字サイズの上限
+    fontMinMm: 4.8, // 文字サイズの下限（これより小さくしない）
+    pageMarginMm: 14, // 印刷時に切れない安全余白
+    pageWidthMm: 210,
+    gapBeforeClosing: 0.5, // 敬具の前の空き（列の間隔の倍数）
+    gapBeforeDateGroup: 1.2, // 日付ブロックの前の空き
+    gapBeforeRecipient: 1.0 // 宛名の前の空き
+  };
+
+  function columnsFor(text) {
+    var len = text ? Array.from(text).length : 0;
+    return Math.max(1, Math.ceil(len / LAYOUT.charsPerColumn));
+  }
+
+  function buildMainSegments() {
+    var jikou = state.jikouText || "";
+    var item4Text = state.item4.trim();
+    var item5Text = state.item5.trim();
+    var musubi = state.musubiText || "";
+
+    return [
+      FIXED.tougo + "　" + jikou,
+      "　" + FIXED.orei,
+      "　実習では、" + item4Text,
+      "　今回の実習を通して、" + item5Text + "ことを学びました。",
+      "　" + FIXED.korekara,
+      "それでは、" + musubi
+    ];
+  }
 
   function appendLine(container, text) {
     if (container.childNodes.length > 0) {
@@ -418,42 +484,60 @@
     container.appendChild(document.createTextNode(text));
   }
 
-  function renderLetterMain() {
+  function renderLetterMain(segments) {
     letterMain.innerHTML = "";
+    segments.forEach(function (seg) {
+      appendLine(letterMain, seg);
+    });
+  }
 
-    var jikou = state.jikouText || "";
-    var item4Text = state.item4.trim();
-    var item5Text = state.item5.trim();
-    var musubi = state.musubiText || "";
+  function applyLayout(mainSegments, dateText, schoolText, deptGradeText, nameText, recipientText) {
+    var mainColumns = mainSegments.reduce(function (sum, seg) {
+      return sum + columnsFor(seg);
+    }, 0);
 
-    appendLine(letterMain, FIXED.tougo + "　" + jikou);
-    letterMain.appendChild(document.createElement("br"));
-    appendLine(letterMain, "　" + FIXED.orei);
-    appendLine(letterMain, "　実習では、" + item4Text);
-    appendLine(letterMain, "　今回の実習を通して、" + item5Text + "ことを学びました。");
-    appendLine(letterMain, "　" + FIXED.korekara);
-    letterMain.appendChild(document.createElement("br"));
-    appendLine(letterMain, "それでは、" + musubi);
+    var totalUnits =
+      mainColumns +
+      LAYOUT.gapBeforeClosing +
+      columnsFor(FIXED.kekkugo) +
+      LAYOUT.gapBeforeDateGroup +
+      columnsFor(dateText) +
+      columnsFor(schoolText) +
+      columnsFor(deptGradeText) +
+      columnsFor(nameText || "　") +
+      LAYOUT.gapBeforeRecipient +
+      columnsFor(recipientText || "　");
+
+    var usableWidthMm = LAYOUT.pageWidthMm - LAYOUT.pageMarginMm * 2;
+    var fontSizeMm = usableWidthMm / (totalUnits * LAYOUT.pitchFactor);
+    fontSizeMm = Math.max(LAYOUT.fontMinMm, Math.min(LAYOUT.fontMaxMm, fontSizeMm));
+
+    var pitchMm = fontSizeMm * LAYOUT.pitchFactor;
+    var colHeightMm = fontSizeMm * LAYOUT.charsPerColumn * LAYOUT.heightBuffer;
+
+    letterPage.style.setProperty("--col-font-size", fontSizeMm.toFixed(2) + "mm");
+    letterPage.style.setProperty("--col-pitch", pitchMm.toFixed(2) + "mm");
+    letterPage.style.setProperty("--col-height", colHeightMm.toFixed(2) + "mm");
+    letterPage.style.setProperty("--page-margin", LAYOUT.pageMarginMm + "mm");
   }
 
   function renderLetter() {
-    renderLetterMain();
-
-    letterDate.innerHTML = "";
-    var reiwaNode = toReiwaString(state.date);
-    if (reiwaNode) {
-      letterDate.appendChild(reiwaNode);
-    }
-
-    letterDeptGrade.textContent = "家政技術科" + state.grade + "年";
-
-    letterName.textContent = state.name;
-
-    letterRecipient.innerHTML = "";
+    var mainSegments = buildMainSegments();
+    var dateText = reiwaKanjiDate(state.date);
+    var schoolText = "さいたま桜高等学園";
+    var deptGradeText = "家政技術科" + state.grade + "年";
+    var nameText = state.name.trim();
     var companyText = state.company.trim();
-    letterRecipient.appendChild(
-      document.createTextNode(companyText ? companyText + "　御中" : "")
-    );
+    var recipientText = companyText ? companyText + "　御中" : "";
+
+    applyLayout(mainSegments, dateText, schoolText, deptGradeText, nameText, recipientText);
+
+    renderLetterMain(mainSegments);
+
+    letterDate.textContent = dateText;
+    letterDeptGrade.textContent = deptGradeText;
+    letterName.textContent = nameText;
+    letterRecipient.textContent = recipientText;
 
     checkFit();
   }
