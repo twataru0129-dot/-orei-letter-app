@@ -156,6 +156,11 @@
   var inputName = $("input-name");
   var backBtn = $("back-btn");
   var printBtn = $("print-btn");
+  var pdfBtn = $("pdf-btn");
+  var pdfModal = $("pdf-modal");
+  var pdfModalBody = $("pdf-modal-body");
+  var pdfCancelBtn = $("pdf-cancel-btn");
+  var pdfOpenBtn = $("pdf-open-btn");
   var fitWarning = $("fit-warning");
   var scrollHint = $("scroll-hint");
   var paperWrap = $("paper-wrap");
@@ -339,6 +344,86 @@
   });
 
   printBtn.addEventListener("click", function () {
+    window.print();
+  });
+
+  /* ---------------- PDFで保存（案内モーダル→window.print） ----------------
+     別のPDFレイアウトは作らず、既存の印刷用CSS（@media print）を
+     そのまま使う。「PDFで保存」は端末に合わせた案内を出したあとに
+     window.print()を呼ぶだけで、実際の印刷・PDF化はブラウザ標準の
+     機能に任せる。端末判定に失敗しても機能自体は必ず使えるよう、
+     判定できない場合は一般的な案内（「その他」）にフォールバックする。 */
+
+  function detectDeviceKind() {
+    try {
+      var ua = navigator.userAgent || "";
+      var platform = navigator.platform || "";
+      // iPadOS 13以降はSafari上でMacと同じUserAgentを名乗るため、
+      // タッチ対応のMacIntelもiPadとして扱う。
+      var isIPadOS = platform === "MacIntel" && typeof navigator.maxTouchPoints === "number" && navigator.maxTouchPoints > 1;
+      if (/iPad|iPhone|iPod/.test(ua) || isIPadOS) {
+        return "ios";
+      }
+      if (/Windows/.test(ua)) {
+        return "windows";
+      }
+    } catch (e) {
+      // 判定に失敗しても「その他」の案内にフォールバックする。
+    }
+    return "other";
+  }
+
+  function pdfGuideText(kind) {
+    var footer = "\n\n必要に応じて、分かりやすい名前を付けて保存してください。";
+
+    if (kind === "windows") {
+      return (
+        "印刷画面が開きます。\n\n" +
+        "プリンターの選択で「Microsoft Print to PDF」または「PDFに保存」を選んでください。\n\n" +
+        "その後「印刷」または「保存」を押し、保存する場所とファイル名を決めてください。" +
+        footer
+      );
+    }
+    if (kind === "ios") {
+      return (
+        "印刷画面が開きます。\n\n" +
+        "印刷プレビューから共有ボタン（□から↑が出ているマーク）を押してください。\n\n" +
+        "「”ファイル”に保存」を選ぶとPDFとして保存できます。\n\n" +
+        "共有ボタンが見つからない場合は、印刷プレビューを大きく表示してから共有ボタンを押してください。" +
+        footer
+      );
+    }
+    return "印刷画面が開きます。\n\n保存先・プリンターの選択で「PDFに保存」などを選んでください。" + footer;
+  }
+
+  function openPdfModal() {
+    pdfModalBody.textContent = pdfGuideText(detectDeviceKind());
+    pdfModal.hidden = false;
+    pdfOpenBtn.focus();
+  }
+
+  function closePdfModal() {
+    pdfModal.hidden = true;
+    pdfBtn.focus();
+  }
+
+  pdfBtn.addEventListener("click", openPdfModal);
+  pdfCancelBtn.addEventListener("click", closePdfModal);
+
+  pdfModal.addEventListener("click", function (e) {
+    if (e.target === pdfModal) {
+      closePdfModal();
+    }
+  });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && !pdfModal.hidden) {
+      closePdfModal();
+    }
+  });
+
+  pdfOpenBtn.addEventListener("click", function () {
+    closePdfModal();
     window.print();
   });
 

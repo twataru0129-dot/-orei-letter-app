@@ -176,12 +176,24 @@
 
       <div class="letter-actions no-print">
         <button id="back-btn" type="button" class="btn btn-secondary btn-large">もどって直す</button>
+        <button id="pdf-btn" type="button" class="btn btn-pdf btn-large">PDFで保存</button>
         <button id="print-btn" type="button" class="btn btn-primary btn-large">印刷する</button>
       </div>
 
     </section>
 
   </main>
+</div>
+
+<div id="pdf-modal" class="modal-overlay no-print" hidden>
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="pdf-modal-title">
+    <h2 id="pdf-modal-title" class="modal-title">PDFで保存する</h2>
+    <p id="pdf-modal-body" class="modal-body"></p>
+    <div class="modal-actions">
+      <button id="pdf-cancel-btn" type="button" class="btn btn-secondary btn-large">キャンセル</button>
+      <button id="pdf-open-btn" type="button" class="btn btn-pdf btn-large">PDF保存画面を開く</button>
+    </div>
+  </div>
 </div>
 
 <script src="app.js"></script>
