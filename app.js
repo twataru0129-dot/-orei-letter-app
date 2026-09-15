@@ -444,6 +444,15 @@
   var CHARS_PER_COLUMN = 25;
   var MAX_PAGES = 6; // 暴走防止の上限（現実的な分量なら1〜2枚で収まる）
 
+  // 氏名を列の下寄せにする位置計算にだけ使う、文字サイズ・列の
+  // 高さ(mm)。styles.css の --page-margin / --chars-per-column /
+  // --height-buffer と同じ計算式・同じ値を保つ必要がある。
+  var PAGE_MARGIN_MM = 14;
+  var PAGE_HEIGHT_MM = 297;
+  var HEIGHT_BUFFER = 1.03;
+  var USABLE_HEIGHT_MM = PAGE_HEIGHT_MM - PAGE_MARGIN_MM * 2;
+  var FONT_SIZE_MM = USABLE_HEIGHT_MM / (CHARS_PER_COLUMN * HEIGHT_BUFFER);
+
   // 文章を1列＝最大25文字のかたまりに分割する。段落の一字下げは
   // 呼び出し側が文章の先頭に全角スペースを入れることで表現され、
   // その文字も含めて先頭のかたまりに入るので、ここでは単純に
@@ -489,12 +498,15 @@
     return chunks;
   }
 
-  function buildClosingParts(dateText, schoolText, deptGradeText, nameText, recipientText) {
+  // 学校名と学科・学年は「同じ学校情報として自然に続く」1つの列
+  // として扱う（school info を分けて2列にすると、後付け全体が
+  // 1列分よけいに必要になり、収まるはずのページが2ページに
+  // なってしまうため）。
+  function buildClosingParts(dateText, schoolInfoText, nameText, recipientText) {
     return {
       keigu: chunkText(FIXED.kekkugo),
       date: chunkText(dateText),
-      school: chunkText(schoolText),
-      deptGrade: chunkText(deptGradeText),
+      schoolInfo: chunkText(schoolInfoText),
       name: chunkText(nameText),
       recipient: chunkText(recipientText)
     };
@@ -504,8 +516,7 @@
     return (
       parts.keigu.length +
       parts.date.length +
-      parts.school.length +
-      parts.deptGrade.length +
+      parts.schoolInfo.length +
       parts.name.length +
       parts.recipient.length
     );
@@ -567,38 +578,57 @@
     return { page: page, content: content };
   }
 
-  function appendChunkedColumn(parent, className, chunks) {
-    var el = document.createElement("div");
-    el.className = className;
+  // chunksをそれぞれ独立した列（div）として追加する。1つのdivの
+  // 中で複数行にすると、行ごとに縦位置（margin-top）を変えられ
+  // ないため、氏名の「最後の列だけ下寄せにする」処理に対応でき
+  // るよう、列＝1つのdivとして描画する。getOffset(i, total, chunk)
+  // を渡すと、そのかたまりだけmargin-topで下にずらせる（例：氏名
+  // の最後のかたまり）。列の高さはCSSで常に1列分ぴったりになる
+  // よう指定されているため、margin-topを足した分だけ高さを差し
+  // 引き、box全体が列1つ分の範囲からはみ出さないようにする
+  // （はみ出すと見た目には出ないが、見えない領域が下のボタンなど
+  // へのクリックを邪魔してしまう可能性があるため）。
+  function appendChunkColumns(parent, className, chunks, getOffsetMm) {
     chunks.forEach(function (chunk, i) {
-      if (i > 0) {
-        el.appendChild(document.createElement("br"));
-      }
+      var el = document.createElement("div");
+      el.className = className;
       el.appendChild(document.createTextNode(chunk));
+      if (getOffsetMm) {
+        var offsetMm = getOffsetMm(i, chunks.length, chunk);
+        if (offsetMm) {
+          el.style.marginTop = offsetMm.toFixed(2) + "mm";
+          el.style.height = (USABLE_HEIGHT_MM - offsetMm).toFixed(2) + "mm";
+        }
+      }
+      parent.appendChild(el);
     });
-    parent.appendChild(el);
-    return el;
+  }
+
+  // 氏名は「下寄せ」：最後の文字が列の下端から2マス空けた位置に
+  // 来るようにする。複数列にまたがる場合、最後の列だけをずらせば
+  // よい（それより前の列はすでに25文字で埋まっている）。
+  function nameOffsetMm(i, total, chunk) {
+    if (i !== total - 1) {
+      return 0;
+    }
+    var chunkLen = Array.from(chunk).length;
+    var blankAbove = Math.max(0, CHARS_PER_COLUMN - chunkLen - 2);
+    return blankAbove * FONT_SIZE_MM;
   }
 
   function buildPageElement(pageDesc, closingParts) {
     var built = createLetterPage();
 
     if (pageDesc.mainChunks.length > 0) {
-      appendChunkedColumn(built.content, "letter-main", pageDesc.mainChunks);
+      appendChunkColumns(built.content, "letter-main", pageDesc.mainChunks);
     }
 
     if (pageDesc.hasClosing) {
-      appendChunkedColumn(built.content, "letter-closing", closingParts.keigu);
-      appendChunkedColumn(built.content, "letter-date", closingParts.date);
-
-      var sender = document.createElement("div");
-      sender.className = "letter-sender";
-      appendChunkedColumn(sender, "letter-school", closingParts.school);
-      appendChunkedColumn(sender, "letter-dept-grade", closingParts.deptGrade);
-      appendChunkedColumn(sender, "letter-name", closingParts.name);
-      built.content.appendChild(sender);
-
-      appendChunkedColumn(built.content, "letter-recipient", closingParts.recipient);
+      appendChunkColumns(built.content, "letter-closing", closingParts.keigu);
+      appendChunkColumns(built.content, "letter-date", closingParts.date);
+      appendChunkColumns(built.content, "letter-school-info", closingParts.schoolInfo);
+      appendChunkColumns(built.content, "letter-name", closingParts.name, nameOffsetMm);
+      appendChunkColumns(built.content, "letter-recipient", closingParts.recipient);
     }
 
     return built.page;
@@ -612,11 +642,12 @@
     var schoolText = "さいたま桜高等学園";
     var gradeKanji = numberToKanji(Number(state.grade) || 1) + "年";
     var deptGradeText = "家政技術科" + gradeKanji;
+    var schoolInfoText = schoolText + "　" + deptGradeText;
     var nameText = state.name.trim();
     var companyText = state.company.trim();
     var recipientText = companyText ? companyText + "　御中" : "";
 
-    var closingParts = buildClosingParts(dateText, schoolText, deptGradeText, nameText, recipientText);
+    var closingParts = buildClosingParts(dateText, schoolInfoText, nameText, recipientText);
     var closingColumns = closingColumnCount(closingParts);
 
     var result = paginate(mainChunks, closingColumns);
@@ -640,6 +671,18 @@
     fitWarning.hidden = !result.truncated;
 
     checkFit();
+    scrollToFirstPage();
+  }
+
+  function scrollToFirstPage() {
+    // 画面上はページ1が右端（日本語の縦書きらしく［2枚目］［1枚目］
+    // の順）に表示されるので、プレビューを開いた直後からページ1が
+    // 見えるよう、横スクロール位置を右端（＝末尾）へ合わせておく。
+    window.requestAnimationFrame(function () {
+      if (paperWrap) {
+        paperWrap.scrollLeft = paperWrap.scrollWidth;
+      }
+    });
   }
 
   function checkFit() {

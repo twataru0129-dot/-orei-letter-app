@@ -534,6 +534,12 @@ textarea:focus, .month-select:focus, input:focus, select:focus {
 
 .letter-pages {
   display: flex;
+  /* Japanese vertical correspondence reads right to left, so page 1
+     belongs on the right with later pages continuing to its left:
+     on screen this is [page N] ... [page 2][page 1]. DOM order stays
+     page1, page2, page3... (see print override below) so the print
+     engine still paints/paginates them in the correct 1→2→3 order. */
+  flex-direction: row-reverse;
   gap: 18px;
   margin: 0 auto;
 }
@@ -619,8 +625,7 @@ textarea:focus, .month-select:focus, input:focus, select:focus {
 .letter-main,
 .letter-closing,
 .letter-date,
-.letter-school,
-.letter-dept-grade,
+.letter-school-info,
 .letter-name,
 .letter-recipient {
   height: var(--usable-height);
@@ -630,12 +635,24 @@ textarea:focus, .month-select:focus, input:focus, select:focus {
   font-weight: bold;
 }
 
+/* 氏名 is bottom-anchored (last character 2 blank cells above the
+   column's bottom edge); the exact margin-top depends on the name's
+   length, so app.js computes and sets it inline per name column. */
+
 /* 敬具 is anchored near the bottom of its own column: the column can
    hold --chars-per-column characters; 敬具 is 2 characters, and the
    rule asks for 2 blank character-cells below it before the column
    ends, so it starts (--chars-per-column - 2 - 2) characters down. */
 .letter-closing {
   margin-top: calc(var(--col-font-size) * (var(--chars-per-column) - 4));
+  /* The shared rule above gives every column box the FULL column
+     height; adding margin-top on top of that would push this box's
+     own bottom edge past the page (harmless to look at since the
+     text itself still sits inside the page, but an invisible
+     out-of-bounds box can still intercept clicks on whatever sits
+     below it). Shrinking the height by the same amount keeps
+     margin + height equal to exactly one column again. */
+  height: calc(var(--usable-height) - (var(--col-font-size) * (var(--chars-per-column) - 4)));
 }
 
 /* ---------------- Letter actions ---------------- */
