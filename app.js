@@ -569,7 +569,7 @@
       "　実習では、" + item4Text,
       "　" + item5Text,
       "　" + FIXED.korekara,
-      "それでは、" + musubi
+      "　それでは、" + musubi
     ];
   }
 
