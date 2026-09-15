@@ -160,12 +160,7 @@
   var scrollHint = $("scroll-hint");
   var paperWrap = $("paper-wrap");
 
-  var letterMain = $("letter-main");
-  var letterDate = $("letter-date");
-  var letterDeptGrade = $("letter-dept-grade");
-  var letterName = $("letter-name");
-  var letterRecipient = $("letter-recipient");
-  var letterPage = $("letter-page");
+  var letterPagesContainer = $("letter-pages");
 
   var step1 = $("step-1");
   var step2 = $("step-2");
@@ -437,28 +432,32 @@
     return yearText + numberToKanji(month) + "月" + numberToKanji(day) + "日";
   }
 
-  /* ---------------- 清書便箋のレイアウト計算 ----------------
-     A4の紙面に、1列およそ20〜25文字の縦書き便箋らしい列で
-     文章を配置するため、内容の文字数から列数を見積もり、
-     紙面の横幅に収まるように文字サイズ（＝列の間隔）を
-     自動調整する。最小文字サイズは下回らない。 */
+  /* ---------------- 清書便箋のレイアウト ----------------
+     縦罫線は「15列」固定、1列はおよそ25文字。列数や文字サイズを
+     内容量から逆算するのではなく、A4の紙面から一度だけ決まる固定
+     値とし（styles.cssの --num-columns / --chars-per-column と
+     揃えている）、文章の量が変わっても罫線の位置・文字サイズは
+     変化しない。15列に収まりきらない分は、同じレイアウトのまま
+     2枚目以降の便箋へ自動的に送る。 */
 
-  var LAYOUT = {
-    charsPerColumn: 24, // 1列あたりの目安文字数（20〜25の範囲）
-    pitchFactor: 1.7, // 列の間隔 = 文字サイズ × この倍率
-    heightBuffer: 1.08, // 1列の高さ = 文字サイズ × 文字数 × この倍率
-    fontMaxMm: 7.5, // 文字サイズの上限
-    fontMinMm: 4.8, // 文字サイズの下限（これより小さくしない）
-    pageMarginMm: 14, // 印刷時に切れない安全余白
-    pageWidthMm: 210,
-    gapBeforeClosing: 0.5, // 敬具の前の空き（列の間隔の倍数）
-    gapBeforeDateGroup: 1.2, // 日付ブロックの前の空き
-    gapBeforeRecipient: 1.0 // 宛名の前の空き
-  };
+  var NUM_COLUMNS = 15;
+  var CHARS_PER_COLUMN = 25;
+  var MAX_PAGES = 6; // 暴走防止の上限（現実的な分量なら1〜2枚で収まる）
 
-  function columnsFor(text) {
-    var len = text ? Array.from(text).length : 0;
-    return Math.max(1, Math.ceil(len / LAYOUT.charsPerColumn));
+  // 文章を1列＝最大25文字のかたまりに分割する。段落の一字下げは
+  // 呼び出し側が文章の先頭に全角スペースを入れることで表現され、
+  // その文字も含めて先頭のかたまりに入るので、ここでは単純に
+  // 25文字ごとに区切るだけでよい。
+  function chunkText(text) {
+    var chars = text ? Array.from(text) : [];
+    if (chars.length === 0) {
+      return [""];
+    }
+    var chunks = [];
+    for (var i = 0; i < chars.length; i += CHARS_PER_COLUMN) {
+      chunks.push(chars.slice(i, i + CHARS_PER_COLUMN).join(""));
+    }
+    return chunks;
   }
 
   function buildMainSegments() {
@@ -467,100 +466,193 @@
     var item5Text = state.item5.trim();
     var musubi = state.musubiText || "";
 
+    // 各要素が新しい段落として独立した列から始まるよう、先頭に
+    // 全角スペース（一字下げ）を入れている。⑤は生徒が書いた
+    // 文章をそのまま使い、前後に文章を書き足さない。
     return [
       FIXED.tougo + "　" + jikou,
       "　" + FIXED.orei,
       "　実習では、" + item4Text,
-      "　今回の実習を通して、" + item5Text + "ことを学びました。",
+      "　" + item5Text,
       "　" + FIXED.korekara,
       "それでは、" + musubi
     ];
   }
 
-  function appendLine(container, text) {
-    if (container.childNodes.length > 0) {
-      container.appendChild(document.createElement("br"));
-    }
-    container.appendChild(document.createTextNode(text));
-  }
-
-  function renderLetterMain(segments) {
-    letterMain.innerHTML = "";
+  function buildMainChunks(segments) {
+    var chunks = [];
     segments.forEach(function (seg) {
-      appendLine(letterMain, seg);
+      chunkText(seg).forEach(function (c) {
+        chunks.push(c);
+      });
     });
+    return chunks;
   }
 
-  function applyLayout(mainSegments, dateText, schoolText, deptGradeText, nameText, recipientText) {
-    var mainColumns = mainSegments.reduce(function (sum, seg) {
-      return sum + columnsFor(seg);
-    }, 0);
+  function buildClosingParts(dateText, schoolText, deptGradeText, nameText, recipientText) {
+    return {
+      keigu: chunkText(FIXED.kekkugo),
+      date: chunkText(dateText),
+      school: chunkText(schoolText),
+      deptGrade: chunkText(deptGradeText),
+      name: chunkText(nameText),
+      recipient: chunkText(recipientText)
+    };
+  }
 
-    var totalUnits =
-      mainColumns +
-      LAYOUT.gapBeforeClosing +
-      columnsFor(FIXED.kekkugo) +
-      LAYOUT.gapBeforeDateGroup +
-      columnsFor(dateText) +
-      columnsFor(schoolText) +
-      columnsFor(deptGradeText) +
-      columnsFor(nameText || "　") +
-      LAYOUT.gapBeforeRecipient +
-      columnsFor(recipientText || "　");
+  function closingColumnCount(parts) {
+    return (
+      parts.keigu.length +
+      parts.date.length +
+      parts.school.length +
+      parts.deptGrade.length +
+      parts.name.length +
+      parts.recipient.length
+    );
+  }
 
-    var usableWidthMm = LAYOUT.pageWidthMm - LAYOUT.pageMarginMm * 2;
-    var fontSizeMm = usableWidthMm / (totalUnits * LAYOUT.pitchFactor);
-    fontSizeMm = Math.max(LAYOUT.fontMinMm, Math.min(LAYOUT.fontMaxMm, fontSizeMm));
+  // 本文の列を、15列ずつのページに割り振る。敬具・日付・学校名・
+  // 氏名・宛名（＝結びの情報）は必ず最後のページにまとめて置き、
+  // 途中のページには表示しない。単純な総文字数ではなく、実際に
+  // 必要な列数から自動的にページ数を判定する。
+  function paginate(mainChunks, closingColumns) {
+    var pages = [];
+    var idx = 0;
+    var total = mainChunks.length;
 
-    var pitchMm = fontSizeMm * LAYOUT.pitchFactor;
-    var colHeightMm = fontSizeMm * LAYOUT.charsPerColumn * LAYOUT.heightBuffer;
+    while (idx < total && pages.length < MAX_PAGES) {
+      var remaining = total - idx;
+      var take;
+      var hasClosing;
+      if (remaining + closingColumns <= NUM_COLUMNS) {
+        take = remaining;
+        hasClosing = true;
+      } else {
+        take = Math.min(NUM_COLUMNS, remaining);
+        hasClosing = false;
+      }
+      pages.push({ mainChunks: mainChunks.slice(idx, idx + take), hasClosing: hasClosing });
+      idx += take;
+    }
 
-    letterPage.style.setProperty("--col-font-size", fontSizeMm.toFixed(2) + "mm");
-    letterPage.style.setProperty("--col-pitch", pitchMm.toFixed(2) + "mm");
-    letterPage.style.setProperty("--col-height", colHeightMm.toFixed(2) + "mm");
-    letterPage.style.setProperty("--page-margin", LAYOUT.pageMarginMm + "mm");
+    if (pages.length === 0) {
+      pages.push({ mainChunks: [], hasClosing: true });
+    } else if (!pages[pages.length - 1].hasClosing) {
+      if (pages.length < MAX_PAGES) {
+        pages.push({ mainChunks: [], hasClosing: true });
+      } else {
+        // ページ上限に達した場合でも、結びの情報は省略せず最終
+        // ページに含める（この場合のみ、その列だけ収まりが
+        // きつくなる可能性がある）。
+        pages[pages.length - 1].hasClosing = true;
+      }
+    }
+
+    return { pages: pages, truncated: idx < total };
+  }
+
+  function createLetterPage() {
+    var page = document.createElement("div");
+    page.className = "letter-page";
+
+    var rules = document.createElement("div");
+    rules.className = "letter-rules";
+    rules.setAttribute("aria-hidden", "true");
+    page.appendChild(rules);
+
+    var content = document.createElement("div");
+    content.className = "letter-content";
+    page.appendChild(content);
+
+    return { page: page, content: content };
+  }
+
+  function appendChunkedColumn(parent, className, chunks) {
+    var el = document.createElement("div");
+    el.className = className;
+    chunks.forEach(function (chunk, i) {
+      if (i > 0) {
+        el.appendChild(document.createElement("br"));
+      }
+      el.appendChild(document.createTextNode(chunk));
+    });
+    parent.appendChild(el);
+    return el;
+  }
+
+  function buildPageElement(pageDesc, closingParts) {
+    var built = createLetterPage();
+
+    if (pageDesc.mainChunks.length > 0) {
+      appendChunkedColumn(built.content, "letter-main", pageDesc.mainChunks);
+    }
+
+    if (pageDesc.hasClosing) {
+      appendChunkedColumn(built.content, "letter-closing", closingParts.keigu);
+      appendChunkedColumn(built.content, "letter-date", closingParts.date);
+
+      var sender = document.createElement("div");
+      sender.className = "letter-sender";
+      appendChunkedColumn(sender, "letter-school", closingParts.school);
+      appendChunkedColumn(sender, "letter-dept-grade", closingParts.deptGrade);
+      appendChunkedColumn(sender, "letter-name", closingParts.name);
+      built.content.appendChild(sender);
+
+      appendChunkedColumn(built.content, "letter-recipient", closingParts.recipient);
+    }
+
+    return built.page;
   }
 
   function renderLetter() {
     var mainSegments = buildMainSegments();
+    var mainChunks = buildMainChunks(mainSegments);
+
     var dateText = reiwaKanjiDate(state.date);
     var schoolText = "さいたま桜高等学園";
-    var deptGradeText = "家政技術科" + state.grade + "年";
+    var gradeKanji = numberToKanji(Number(state.grade) || 1) + "年";
+    var deptGradeText = "家政技術科" + gradeKanji;
     var nameText = state.name.trim();
     var companyText = state.company.trim();
     var recipientText = companyText ? companyText + "　御中" : "";
 
-    applyLayout(mainSegments, dateText, schoolText, deptGradeText, nameText, recipientText);
+    var closingParts = buildClosingParts(dateText, schoolText, deptGradeText, nameText, recipientText);
+    var closingColumns = closingColumnCount(closingParts);
 
-    renderLetterMain(mainSegments);
+    var result = paginate(mainChunks, closingColumns);
 
-    letterDate.textContent = dateText;
-    letterDeptGrade.textContent = deptGradeText;
-    letterName.textContent = nameText;
-    letterRecipient.textContent = recipientText;
+    letterPagesContainer.innerHTML = "";
+    result.pages.forEach(function (pageDesc, i) {
+      var block = document.createElement("div");
+      block.className = "page-block";
+
+      if (result.pages.length > 1) {
+        var label = document.createElement("p");
+        label.className = "page-label no-print";
+        label.textContent = (i + 1) + "枚目 ／ 全" + result.pages.length + "枚";
+        block.appendChild(label);
+      }
+
+      block.appendChild(buildPageElement(pageDesc, closingParts));
+      letterPagesContainer.appendChild(block);
+    });
+
+    fitWarning.hidden = !result.truncated;
 
     checkFit();
   }
 
   function checkFit() {
     window.requestAnimationFrame(function () {
-      if (!letterPage) {
+      if (!paperWrap || !letterPagesContainer) {
         return;
       }
-      // letterPage has a fixed physical width (A4). Compare its own
-      // scrollWidth against its own clientWidth so a narrow phone screen
-      // (which just needs horizontal scrolling to view the page) is never
-      // mistaken for text that doesn't fit on the printed page itself.
-      var overflowing = letterPage.scrollWidth > letterPage.clientWidth + 2;
-      fitWarning.hidden = !overflowing;
-
-      // The letter-page has a fixed A4 width, so on a narrow phone screen
-      // the preview box itself needs horizontal scrolling even when the
-      // text fits the page perfectly. Let students know they can scroll.
-      if (paperWrap) {
-        var needsScroll = letterPage.scrollWidth > paperWrap.clientWidth + 2;
-        scrollHint.hidden = !needsScroll;
-      }
+      // 便箋はA4の実寸幅で表示しているため、スマートフォンなど
+      // 画面が狭い端末では横スクロールが必要になる。これは内容が
+      // はみ出しているのではなく、単に画面が便箋より狭いだけなので
+      // fit-warning ではなく案内（scroll-hint）で知らせる。
+      var needsScroll = letterPagesContainer.scrollWidth > paperWrap.clientWidth + 2;
+      scrollHint.hidden = !needsScroll;
     });
   }
 

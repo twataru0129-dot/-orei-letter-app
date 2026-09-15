@@ -81,13 +81,15 @@
         <!-- ⑤ 心に残ったこと／学んだこと -->
         <div class="item item-5">
           <div class="item-label">⑤ 心に残ったこと／学んだこと</div>
-          <div class="item-desc">実習を通して気付いたことや、学んだことを書こう</div>
+          <div class="item-desc">実習を通して気付いたことや、学んだことを、文章のはじめから終わりまで自由に書こう</div>
           <div class="item-body">
-            <div class="sentence-row sentence-row-wrap">
-              <span class="fixed-fragment">今回の実習を通して、</span>
-              <textarea id="input-5" rows="3" placeholder="（例）仕事では周りの人と協力することが大切だという"></textarea>
-              <span class="fixed-fragment">ことを学びました。</span>
-            </div>
+            <textarea id="input-5" rows="4" placeholder="（例）仕事では、周りの人とコミュニケーションを取ることが大切だと学びました。"></textarea>
+            <p class="example-heading">文章の例（そのまま書き写さなくてもよい）</p>
+            <ul class="example-list">
+              <li>仕事では、周りの人とコミュニケーションを取ることが大切だと学びました。</li>
+              <li>時間を守ることの大切さが分かりました。</li>
+              <li>分からないことは、自分から質問することが大切だと思いました。</li>
+            </ul>
           </div>
         </div>
 
@@ -163,23 +165,13 @@
       </div>
 
       <div id="fit-warning" class="fit-warning no-print" hidden>
-        文章が長いため、便箋からはみ出す場合があります。④や⑤の文章を短くすると収まりやすくなります。
+        文章がとても長いため、便箋の枚数の上限をこえています。④や⑤の文章を少し短くしてください。
       </div>
 
       <p id="scroll-hint" class="scroll-hint no-print" hidden>← 横にスクロールすると、便箋全体を確認できます →</p>
 
       <div class="paper-wrap" id="paper-wrap">
-        <div class="letter-page" id="letter-page">
-          <div class="letter-main" id="letter-main"></div>
-          <div class="letter-closing">敬具</div>
-          <div class="letter-date" id="letter-date"></div>
-          <div class="letter-sender">
-            <div class="letter-school">さいたま桜高等学園</div>
-            <div class="letter-dept-grade" id="letter-dept-grade"></div>
-            <div class="letter-name" id="letter-name"></div>
-          </div>
-          <div class="letter-recipient" id="letter-recipient"></div>
-        </div>
+        <div id="letter-pages" class="letter-pages"></div>
       </div>
 
       <div class="letter-actions no-print">
