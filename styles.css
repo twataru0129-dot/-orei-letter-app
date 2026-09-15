@@ -412,12 +412,12 @@ textarea:focus, .month-select:focus, input:focus, select:focus {
   background: #eaf6f1;
 }
 
-.btn-pdf {
+.btn-save {
   background: #1d5fb8;
   color: #fff;
 }
 
-.btn-pdf:hover {
+.btn-save:hover {
   filter: brightness(1.08);
 }
 
@@ -716,6 +716,47 @@ textarea:focus, .month-select:focus, input:focus, select:focus {
   justify-content: center;
   gap: 14px;
   flex-wrap: wrap;
+}
+
+/* ---------------- 画像で保存（iPhone/iPad）のプレビュー ---------------- */
+
+.image-preview-box {
+  max-width: 92vw;
+  max-height: 88vh;
+  overflow-y: auto;
+}
+
+.image-preview-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-bottom: 22px;
+}
+
+.image-preview-item {
+  text-align: center;
+}
+
+.image-preview-item img {
+  max-width: 100%;
+  height: auto;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.image-preview-caption {
+  margin: 8px 0 0;
+  font-size: 0.9rem;
+  color: var(--text-sub);
+}
+
+/* ---------------- 保存エラーの表示 ---------------- */
+
+.save-error-box {
+  max-width: 640px;
+  margin: 16px auto 0;
+  text-align: center;
 }
 
 /* ==========================================================

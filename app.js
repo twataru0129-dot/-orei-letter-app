@@ -156,11 +156,17 @@
   var inputName = $("input-name");
   var backBtn = $("back-btn");
   var printBtn = $("print-btn");
-  var pdfBtn = $("pdf-btn");
-  var pdfModal = $("pdf-modal");
-  var pdfModalBody = $("pdf-modal-body");
-  var pdfCancelBtn = $("pdf-cancel-btn");
-  var pdfOpenBtn = $("pdf-open-btn");
+  var saveBtn = $("save-btn");
+  var saveGuideModal = $("save-guide-modal");
+  var saveGuideTitle = $("save-guide-title");
+  var saveGuideBody = $("save-guide-body");
+  var saveGuideCancelBtn = $("save-guide-cancel-btn");
+  var saveGuideActionBtn = $("save-guide-action-btn");
+  var saveErrorBox = $("save-error-box");
+  var saveErrorText = $("save-error-text");
+  var imagePreviewModal = $("image-preview-modal");
+  var imagePreviewList = $("image-preview-list");
+  var imagePreviewCloseBtn = $("image-preview-close-btn");
   var fitWarning = $("fit-warning");
   var scrollHint = $("scroll-hint");
   var paperWrap = $("paper-wrap");
@@ -347,12 +353,14 @@
     window.print();
   });
 
-  /* ---------------- PDFで保存（案内モーダル→window.print） ----------------
-     別のPDFレイアウトは作らず、既存の印刷用CSS（@media print）を
-     そのまま使う。「PDFで保存」は端末に合わせた案内を出したあとに
-     window.print()を呼ぶだけで、実際の印刷・PDF化はブラウザ標準の
-     機能に任せる。端末判定に失敗しても機能自体は必ず使えるよう、
-     判定できない場合は一般的な案内（「その他」）にフォールバックする。 */
+  /* ---------------- 保存（PDF／画像）の案内モーダル ----------------
+     PCでは従来どおり「PDFで保存」（案内モーダル→window.print()）。
+     iPhone/iPadでは、Safariの印刷・PDF化で空白ページや黒背景が
+     発生する問題があるため、便箋のページだけを画像として保存する
+     「画像で保存」に切り替える。中央のボタン（#save-btn）は同じ
+     要素のまま、端末に応じてラベルと動作だけを切り替える。
+     端末判定に失敗した場合も、必ずPDF保存側にフォールバックして
+     機能自体が壊れないようにする。 */
 
   function detectDeviceKind() {
     try {
@@ -372,6 +380,11 @@
     }
     return "other";
   }
+
+  var deviceKind = detectDeviceKind();
+  var useImageSave = deviceKind === "ios";
+
+  saveBtn.textContent = useImageSave ? "画像で保存" : "PDFで保存";
 
   function pdfGuideText(kind) {
     var footer = "\n\n必要に応じて、分かりやすい名前を付けて保存してください。";
@@ -396,36 +409,375 @@
     return "印刷画面が開きます。\n\n保存先・プリンターの選択で「PDFに保存」などを選んでください。" + footer;
   }
 
-  function openPdfModal() {
-    pdfModalBody.textContent = pdfGuideText(detectDeviceKind());
-    pdfModal.hidden = false;
-    pdfOpenBtn.focus();
+  function imageGuideText() {
+    return (
+      "便箋を画像にして保存します。\n\n" +
+      "このあと共有画面が開きます。\n\n" +
+      "「画像を保存」または「”ファイル”に保存」を選んでください。\n\n" +
+      "ページが2枚以上ある場合は、ページごとに画像が用意されます。"
+    );
   }
 
-  function closePdfModal() {
-    pdfModal.hidden = true;
-    pdfBtn.focus();
+  function openSaveGuideModal() {
+    hideSaveError();
+    if (useImageSave) {
+      saveGuideTitle.textContent = "画像で保存する";
+      saveGuideBody.textContent = imageGuideText();
+      saveGuideActionBtn.textContent = "画像を保存する";
+    } else {
+      saveGuideTitle.textContent = "PDFで保存する";
+      saveGuideBody.textContent = pdfGuideText(deviceKind);
+      saveGuideActionBtn.textContent = "PDF保存画面を開く";
+    }
+    saveGuideModal.hidden = false;
+    saveGuideActionBtn.focus();
   }
 
-  pdfBtn.addEventListener("click", openPdfModal);
-  pdfCancelBtn.addEventListener("click", closePdfModal);
+  function closeSaveGuideModal() {
+    saveGuideModal.hidden = true;
+    saveBtn.focus();
+  }
 
-  pdfModal.addEventListener("click", function (e) {
-    if (e.target === pdfModal) {
-      closePdfModal();
+  saveBtn.addEventListener("click", openSaveGuideModal);
+  saveGuideCancelBtn.addEventListener("click", closeSaveGuideModal);
+
+  saveGuideModal.addEventListener("click", function (e) {
+    if (e.target === saveGuideModal) {
+      closeSaveGuideModal();
     }
   });
 
   document.addEventListener("keydown", function (e) {
-    if (e.key === "Escape" && !pdfModal.hidden) {
-      closePdfModal();
+    if (e.key !== "Escape") {
+      return;
+    }
+    if (!saveGuideModal.hidden) {
+      closeSaveGuideModal();
+    }
+    if (!imagePreviewModal.hidden) {
+      closeImagePreview();
     }
   });
 
-  pdfOpenBtn.addEventListener("click", function () {
-    closePdfModal();
-    window.print();
+  saveGuideActionBtn.addEventListener("click", function () {
+    closeSaveGuideModal();
+    if (useImageSave) {
+      saveAsImages();
+    } else {
+      window.print();
+    }
   });
+
+  /* ---------------- 保存エラーの表示 ---------------- */
+
+  function showSaveError(message) {
+    saveErrorText.textContent = message;
+    saveErrorBox.hidden = false;
+    saveErrorBox.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  function hideSaveError() {
+    saveErrorBox.hidden = true;
+  }
+
+  /* ---------------- 画像で保存（iPhone/iPad向け） ----------------
+     便箋を画像化する方法として、最初はDOMをSVGのforeignObjectで
+     複製し、それをcanvasへ描画してからPNG化する方式を試したが、
+     foreignObjectを含むSVG画像をcanvasへ描画すると、その内容に
+     関係なくブラウザの仕様上「tainted canvas（汚染された
+     キャンバス）」扱いになり、toBlob/toDataURLでの画像取得が
+     どのブラウザでも一律に失敗することが分かった（これはブラウザ
+     の実装差ではなく、HTML/Canvas仕様で定められた挙動）。
+     そのため、DOMを画像化するのではなく、canvas上に便箋のマス目・
+     縦罫線・文字を直接描画する方式に変更した。列数・1列の文字数・
+     余白・フォントサイズなどは、清書のレイアウトで使っている値
+     （PAGE_MARGIN_MM / NUM_COLUMNS / CHARS_PER_COLUMN /
+     HEIGHT_BUFFER など、後述）とまったく同じ計算式を使うため、
+     見た目は清書プレビューと同じになる。canvasへの直接描画のみを
+     行うため、tainted canvasにはならず、PNGとして確実に書き出せる。
+     外部ライブラリ・CDNは使用していない。 */
+
+  var SAVE_IMAGE_SCALE = 3; // 印刷見本として使えるよう高解像度で書き出す
+  var MM_TO_PX_BASE = 96 / 25.4;
+  var SAVE_FONT_FAMILY =
+    '"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic","YuGothic","Meiryo",' +
+    '"Noto Sans CJK JP","Noto Sans JP",sans-serif';
+
+  // text-orientation: mixed の縦書きで、90度回転して縦線として
+  // 表示される文字（長音符・カッコ類など）。
+  var ROTATE_VERTICAL_CHARS = {
+    "ー": true, "―": true, "〜": true, "～": true,
+    "「": true, "」": true, "『": true, "』": true,
+    "（": true, "）": true, "(": true, ")": true
+  };
+
+  // 縦書きでは、句読点はセルの中央ではなく右上寄りに描かれるのが
+  // 自然な見た目になる。
+  var SHIFT_PUNCT_CHARS = { "、": true, "。": true };
+
+  // 1ページぶんの列データ（{text, className, offsetMm}の配列）から、
+  // 清書プレビューと同じ見た目のcanvasを描画する。scaleは出力解像度
+  // の倍率（画面の等倍を1とする）。
+  function renderPageCanvas(pageChunks, scale) {
+    var mmToPx = MM_TO_PX_BASE * scale;
+    var pageWpx = 210 * mmToPx;
+    var pageHpx = 297 * mmToPx;
+    var marginPx = PAGE_MARGIN_MM * mmToPx;
+    var usableWpx = pageWpx - marginPx * 2;
+    var usableHpx = pageHpx - marginPx * 2;
+    var rulePitchPx = usableWpx / NUM_COLUMNS; // 列の「横方向」の間隔（罫線の位置に使う）
+    var fontSizePx = usableHpx / (CHARS_PER_COLUMN * HEIGHT_BUFFER);
+    // 1文字ぶんの「縦方向」の間隔。writing-mode: vertical-rl では
+    // CSSのline-heightは列の横幅（rule-pitch）に対応する値であり、
+    // 縦方向の文字間隔はそれとは別に、列の高さを25文字で均等に
+    // 割った値になる（列の最後の文字がちょうど罫線の下端に来る）。
+    var charPitchPx = usableHpx / CHARS_PER_COLUMN;
+
+    var canvas = document.createElement("canvas");
+    canvas.width = Math.round(pageWpx);
+    canvas.height = Math.round(pageHpx);
+    var ctx = canvas.getContext("2d");
+
+    // 白背景・黒文字を必ず使う（端末のダークモード設定に関わらず）。
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // 縦罫線（15列、薄いグレー）。右端を起点に左へ向かって
+    // rulePitchPxごとに16本引く（CSSのrepeating-linear-gradient
+    // (to left, ...) と同じ並び方）。
+    ctx.strokeStyle = "#b3b3b3";
+    ctx.lineWidth = Math.max(1, Math.round(scale));
+    for (var li = 0; li <= NUM_COLUMNS; li++) {
+      var lx = Math.round(marginPx + usableWpx - li * rulePitchPx) + 0.5;
+      ctx.beginPath();
+      ctx.moveTo(lx, marginPx);
+      ctx.lineTo(lx, marginPx + usableHpx);
+      ctx.stroke();
+    }
+
+    // 本文（右の列から左の列へ、各列は上から下へ1文字ずつ）。
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#000000";
+
+    pageChunks.forEach(function (chunk, colIndex) {
+      var centerX = marginPx + usableWpx - (colIndex + 0.5) * rulePitchPx;
+      var isBold = chunk.className === "letter-recipient";
+      ctx.font = (isBold ? "bold " : "") + fontSizePx + "px " + SAVE_FONT_FAMILY;
+
+      var colTop = marginPx + (chunk.offsetMm ? chunk.offsetMm * mmToPx : 0);
+
+      Array.from(chunk.text).forEach(function (ch, charIndex) {
+        if (ch === " " || ch === "　") {
+          return; // 空白文字自体は描かない（一字下げの空きマスになる）
+        }
+        var cellTop = colTop + charIndex * charPitchPx;
+        var cellCenterY = cellTop + charPitchPx / 2;
+
+        if (ROTATE_VERTICAL_CHARS[ch]) {
+          ctx.save();
+          ctx.translate(centerX, cellCenterY);
+          ctx.rotate(Math.PI / 2);
+          ctx.fillText(ch, 0, 0);
+          ctx.restore();
+        } else if (SHIFT_PUNCT_CHARS[ch]) {
+          ctx.fillText(ch, centerX + fontSizePx * 0.28, cellTop + fontSizePx * 0.38);
+        } else {
+          ctx.fillText(ch, centerX, cellCenterY);
+        }
+      });
+    });
+
+    return canvas;
+  }
+
+  function canvasToPngBlob(canvas) {
+    return new Promise(function (resolve, reject) {
+      try {
+        canvas.toBlob(function (blob) {
+          if (blob) {
+            resolve(blob);
+          } else {
+            reject(new Error("canvas toBlob returned null"));
+          }
+        }, "image/png");
+      } catch (e) {
+        reject(e);
+      }
+    });
+  }
+
+  function buildImageFilenameBase(pageNum, totalPages) {
+    var namePart = state.name.trim().replace(/\s+/g, "");
+    var base = "お礼状";
+    if (namePart) {
+      base += "_" + namePart;
+    }
+    if (totalPages > 1) {
+      base += "_" + pageNum + "ページ目";
+    }
+    return base;
+  }
+
+  function buildPageImageFile(pageChunks, pageNum, totalPages) {
+    var filenameBase = buildImageFilenameBase(pageNum, totalPages);
+    var canvas = renderPageCanvas(pageChunks, SAVE_IMAGE_SCALE);
+    return canvasToPngBlob(canvas).then(function (blob) {
+      return new File([blob], filenameBase + ".png", { type: "image/png" });
+    });
+  }
+
+  // Web Share APIで画像を共有する。複数ページをまとめて共有できる
+  // 場合はまとめて、できない場合は1枚ずつ順番に共有する。
+  // ユーザーが共有シートをキャンセルした場合はエラー扱いにせず、
+  // 「共有は試みた（＝それ以上フォールバックのプレビューは出さない）」
+  // として扱う。それ以外の失敗は呼び出し側でプレビューにフォール
+  // バックする。
+  function isShareCancel(err) {
+    return !!err && err.name === "AbortError";
+  }
+
+  function tryShareFiles(files) {
+    if (!navigator.share || !navigator.canShare) {
+      return Promise.resolve(false);
+    }
+    try {
+      if (navigator.canShare({ files: files })) {
+        return navigator.share({
+          files: files,
+          title: "お礼状",
+          text: "お礼状の便箋画像です。"
+        }).then(function () {
+          return true;
+        }).catch(function (err) {
+          if (isShareCancel(err)) {
+            return true;
+          }
+          throw err;
+        });
+      }
+      if (files.length > 1) {
+        var chain = Promise.resolve();
+        var allShared = true;
+        var cancelled = false;
+        files.forEach(function (file, i) {
+          chain = chain.then(function () {
+            if (cancelled) {
+              return;
+            }
+            if (!navigator.canShare({ files: [file] })) {
+              allShared = false;
+              return;
+            }
+            return navigator.share({
+              files: [file],
+              title: "お礼状",
+              text: "お礼状の便箋画像（" + (i + 1) + "枚目）です。"
+            }).catch(function (err) {
+              if (isShareCancel(err)) {
+                cancelled = true;
+                return;
+              }
+              throw err;
+            });
+          });
+        });
+        return chain.then(function () {
+          return cancelled ? true : allShared;
+        });
+      }
+      return Promise.resolve(false);
+    } catch (e) {
+      return Promise.reject(e);
+    }
+  }
+
+  var previewObjectUrls = [];
+
+  function showImagePreview(files) {
+    previewObjectUrls.forEach(function (url) {
+      URL.revokeObjectURL(url);
+    });
+    previewObjectUrls = [];
+
+    imagePreviewList.innerHTML = "";
+    files.forEach(function (file) {
+      var url = URL.createObjectURL(file);
+      previewObjectUrls.push(url);
+
+      var item = document.createElement("div");
+      item.className = "image-preview-item";
+
+      var img = document.createElement("img");
+      img.src = url;
+      img.alt = file.name;
+
+      var caption = document.createElement("p");
+      caption.className = "image-preview-caption";
+      caption.textContent = file.name;
+
+      item.appendChild(img);
+      item.appendChild(caption);
+      imagePreviewList.appendChild(item);
+    });
+
+    imagePreviewModal.hidden = false;
+    imagePreviewCloseBtn.focus();
+  }
+
+  function closeImagePreview() {
+    imagePreviewModal.hidden = true;
+    saveBtn.focus();
+  }
+
+  imagePreviewCloseBtn.addEventListener("click", closeImagePreview);
+  imagePreviewModal.addEventListener("click", function (e) {
+    if (e.target === imagePreviewModal) {
+      closeImagePreview();
+    }
+  });
+
+  function saveAsImages() {
+    hideSaveError();
+    var originalLabel = saveBtn.textContent;
+    saveBtn.disabled = true;
+    saveBtn.textContent = "画像を作成中…";
+
+    Promise.resolve()
+      .then(function () {
+        var pages = lastRenderedPages;
+        if (!pages || pages.length === 0) {
+          throw new Error("no letter pages found");
+        }
+
+        var files = [];
+        var chain = Promise.resolve();
+        pages.forEach(function (pageChunks, i) {
+          chain = chain.then(function () {
+            return buildPageImageFile(pageChunks, i + 1, pages.length).then(function (file) {
+              files.push(file);
+            });
+          });
+        });
+
+        return chain.then(function () {
+          return tryShareFiles(files).catch(function () {
+            return false;
+          });
+        }).then(function (shared) {
+          if (!shared) {
+            showImagePreview(files);
+          }
+        });
+      })
+      .catch(function () {
+        showSaveError("画像の保存に失敗しました。もう一度お試しください。");
+      })
+      .then(function () {
+        saveBtn.disabled = false;
+        saveBtn.textContent = originalLabel;
+      });
+  }
 
   /* ---------------- 清書フォームの入力 ---------------- */
 
@@ -700,6 +1052,12 @@
     return built.page;
   }
 
+  // renderLetter()が最後に計算したページごとの列データ。DOMを
+  // 再度読み取らなくても「画像で保存」がそのまま使えるように、
+  // ここに保持しておく（個人情報を外部へ送るものではなく、
+  // メモリ上に保持するだけ）。
+  var lastRenderedPages = [];
+
   function renderLetter() {
     var mainSegments = buildMainSegments();
     var mainChunks = buildMainChunks(mainSegments);
@@ -717,6 +1075,7 @@
     var allChunks = mainChunks.concat(closingChunks);
 
     var result = paginateFlat(allChunks);
+    lastRenderedPages = result.pages;
 
     letterPagesContainer.innerHTML = "";
     result.pages.forEach(function (pageChunks, i) {
