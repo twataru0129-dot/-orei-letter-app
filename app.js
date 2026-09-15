@@ -488,75 +488,87 @@
     ];
   }
 
+  // 本文・敬具・日付・学校情報・氏名・宛名のすべてを、1つの
+  // 連続した列の並びとして組み立てる。「敬具以降をセットで次の
+  // ページへ送る」のではなく、本文が終わった直後の列から続けて
+  // 敬具→日付→学校情報→氏名→宛名の順に1列ずつ並べ、ページの
+  // 15列を使い切ったところで自然に次のページへ続く（後述の
+  // paginateFlatが単純に15列ごとに区切るだけで済む）。
+  // 各要素は {text, className, offsetMm} の配列で表現する。
+  // offsetMmは、その列の文字を上下どちらかへ寄せるための
+  // margin-top（0なら列の一番上から書き始める＝既定の配置）。
   function buildMainChunks(segments) {
     var chunks = [];
     segments.forEach(function (seg) {
       chunkText(seg).forEach(function (c) {
-        chunks.push(c);
+        chunks.push({ text: c, className: "letter-main", offsetMm: 0 });
       });
     });
     return chunks;
   }
 
+  var TOP_GAP_CHARS = 2; // 日付・学校情報・宛名は上から2マス空けて書き始める
+  var KEIGU_BOTTOM_GAP_CHARS = 2; // 敬具は下から2マス空けた位置に書く
+  var NAME_BOTTOM_GAP_CHARS = 2; // 氏名の最後の文字は下から2マス空けた位置
+
+  function topOffsetChunks(text, className) {
+    return chunkText(text).map(function (c, i) {
+      // 2列目以降（同じ項目が25文字を超えて折り返した続き）は
+      // 上寄せの空白を繰り返さず、そのまま列の上から続ける。
+      return { text: c, className: className, offsetMm: i === 0 ? TOP_GAP_CHARS * FONT_SIZE_MM : 0 };
+    });
+  }
+
   // 学校名と学科・学年は「同じ学校情報として自然に続く」1つの列
-  // として扱う（school info を分けて2列にすると、後付け全体が
-  // 1列分よけいに必要になり、収まるはずのページが2ページに
-  // なってしまうため）。
-  function buildClosingParts(dateText, schoolInfoText, nameText, recipientText) {
-    return {
-      keigu: chunkText(FIXED.kekkugo),
-      date: chunkText(dateText),
-      schoolInfo: chunkText(schoolInfoText),
-      name: chunkText(nameText),
-      recipient: chunkText(recipientText)
-    };
+  // として扱う（分けて2列にすると、後付け全体が1列分よけいに
+  // 必要になってしまうため）。
+  function buildClosingChunks(dateText, schoolInfoText, nameText, recipientText) {
+    var chunks = [];
+
+    // 敬具：列の下端から2マス空けた位置に配置（必ず1列＝2文字）。
+    chunks.push({
+      text: FIXED.kekkugo,
+      className: "letter-closing",
+      offsetMm: (CHARS_PER_COLUMN - KEIGU_BOTTOM_GAP_CHARS - Array.from(FIXED.kekkugo).length) * FONT_SIZE_MM
+    });
+
+    chunks = chunks.concat(topOffsetChunks(dateText, "letter-date"));
+    chunks = chunks.concat(topOffsetChunks(schoolInfoText, "letter-school-info"));
+
+    // 氏名：最後の文字が列の下端から2マス空けた位置に来るよう、
+    // 最後のかたまりだけ下寄せにする。
+    var nameParts = chunkText(nameText);
+    nameParts.forEach(function (c, i) {
+      var offsetMm = 0;
+      if (i === nameParts.length - 1) {
+        var blankAbove = Math.max(0, CHARS_PER_COLUMN - Array.from(c).length - NAME_BOTTOM_GAP_CHARS);
+        offsetMm = blankAbove * FONT_SIZE_MM;
+      }
+      chunks.push({ text: c, className: "letter-name", offsetMm: offsetMm });
+    });
+
+    chunks = chunks.concat(topOffsetChunks(recipientText, "letter-recipient"));
+
+    return chunks;
   }
 
-  function closingColumnCount(parts) {
-    return (
-      parts.keigu.length +
-      parts.date.length +
-      parts.schoolInfo.length +
-      parts.name.length +
-      parts.recipient.length
-    );
-  }
-
-  // 本文の列を、15列ずつのページに割り振る。敬具・日付・学校名・
-  // 氏名・宛名（＝結びの情報）は必ず最後のページにまとめて置き、
-  // 途中のページには表示しない。単純な総文字数ではなく、実際に
-  // 必要な列数から自動的にページ数を判定する。
-  function paginate(mainChunks, closingColumns) {
+  // 連続した列の並びを、単純に15列ごとに区切ってページに割り振る。
+  // 本文と後付け（敬具〜宛名）を特別扱いせず同じ並びとして扱う
+  // ことで、1ページ目の残り列をできるだけ使い切ってから、本当に
+  // 収まりきらない分だけ自然に次のページへ続くようにしている。
+  function paginateFlat(allChunks) {
     var pages = [];
     var idx = 0;
-    var total = mainChunks.length;
+    var total = allChunks.length;
 
     while (idx < total && pages.length < MAX_PAGES) {
-      var remaining = total - idx;
-      var take;
-      var hasClosing;
-      if (remaining + closingColumns <= NUM_COLUMNS) {
-        take = remaining;
-        hasClosing = true;
-      } else {
-        take = Math.min(NUM_COLUMNS, remaining);
-        hasClosing = false;
-      }
-      pages.push({ mainChunks: mainChunks.slice(idx, idx + take), hasClosing: hasClosing });
+      var take = Math.min(NUM_COLUMNS, total - idx);
+      pages.push(allChunks.slice(idx, idx + take));
       idx += take;
     }
 
     if (pages.length === 0) {
-      pages.push({ mainChunks: [], hasClosing: true });
-    } else if (!pages[pages.length - 1].hasClosing) {
-      if (pages.length < MAX_PAGES) {
-        pages.push({ mainChunks: [], hasClosing: true });
-      } else {
-        // ページ上限に達した場合でも、結びの情報は省略せず最終
-        // ページに含める（この場合のみ、その列だけ収まりが
-        // きつくなる可能性がある）。
-        pages[pages.length - 1].hasClosing = true;
-      }
+      pages.push([]);
     }
 
     return { pages: pages, truncated: idx < total };
@@ -578,59 +590,28 @@
     return { page: page, content: content };
   }
 
-  // chunksをそれぞれ独立した列（div）として追加する。1つのdivの
-  // 中で複数行にすると、行ごとに縦位置（margin-top）を変えられ
-  // ないため、氏名の「最後の列だけ下寄せにする」処理に対応でき
-  // るよう、列＝1つのdivとして描画する。getOffset(i, total, chunk)
-  // を渡すと、そのかたまりだけmargin-topで下にずらせる（例：氏名
-  // の最後のかたまり）。列の高さはCSSで常に1列分ぴったりになる
-  // よう指定されているため、margin-topを足した分だけ高さを差し
-  // 引き、box全体が列1つ分の範囲からはみ出さないようにする
-  // （はみ出すと見た目には出ないが、見えない領域が下のボタンなど
-  // へのクリックを邪魔してしまう可能性があるため）。
-  function appendChunkColumns(parent, className, chunks, getOffsetMm) {
-    chunks.forEach(function (chunk, i) {
+  // 1ページぶんの列の並び（{text, className, offsetMm}の配列）を
+  // 実際のdivとして描画する。列の高さはCSSで常に1列分ぴったりに
+  // なるよう指定されているため、offsetMm（margin-top）を足した分
+  // だけ高さを差し引き、box全体が列1つ分の範囲からはみ出さない
+  // ようにする（はみ出すと見た目には出ないが、見えない領域が下の
+  // ボタンなどへのクリックを邪魔してしまう可能性があるため）。
+  function renderChunksAsColumns(parent, chunks) {
+    chunks.forEach(function (chunk) {
       var el = document.createElement("div");
-      el.className = className;
-      el.appendChild(document.createTextNode(chunk));
-      if (getOffsetMm) {
-        var offsetMm = getOffsetMm(i, chunks.length, chunk);
-        if (offsetMm) {
-          el.style.marginTop = offsetMm.toFixed(2) + "mm";
-          el.style.height = (USABLE_HEIGHT_MM - offsetMm).toFixed(2) + "mm";
-        }
+      el.className = chunk.className;
+      el.appendChild(document.createTextNode(chunk.text));
+      if (chunk.offsetMm) {
+        el.style.marginTop = chunk.offsetMm.toFixed(2) + "mm";
+        el.style.height = (USABLE_HEIGHT_MM - chunk.offsetMm).toFixed(2) + "mm";
       }
       parent.appendChild(el);
     });
   }
 
-  // 氏名は「下寄せ」：最後の文字が列の下端から2マス空けた位置に
-  // 来るようにする。複数列にまたがる場合、最後の列だけをずらせば
-  // よい（それより前の列はすでに25文字で埋まっている）。
-  function nameOffsetMm(i, total, chunk) {
-    if (i !== total - 1) {
-      return 0;
-    }
-    var chunkLen = Array.from(chunk).length;
-    var blankAbove = Math.max(0, CHARS_PER_COLUMN - chunkLen - 2);
-    return blankAbove * FONT_SIZE_MM;
-  }
-
-  function buildPageElement(pageDesc, closingParts) {
+  function buildPageElement(pageChunks) {
     var built = createLetterPage();
-
-    if (pageDesc.mainChunks.length > 0) {
-      appendChunkColumns(built.content, "letter-main", pageDesc.mainChunks);
-    }
-
-    if (pageDesc.hasClosing) {
-      appendChunkColumns(built.content, "letter-closing", closingParts.keigu);
-      appendChunkColumns(built.content, "letter-date", closingParts.date);
-      appendChunkColumns(built.content, "letter-school-info", closingParts.schoolInfo);
-      appendChunkColumns(built.content, "letter-name", closingParts.name, nameOffsetMm);
-      appendChunkColumns(built.content, "letter-recipient", closingParts.recipient);
-    }
-
+    renderChunksAsColumns(built.content, pageChunks);
     return built.page;
   }
 
@@ -647,13 +628,13 @@
     var companyText = state.company.trim();
     var recipientText = companyText ? companyText + "　御中" : "";
 
-    var closingParts = buildClosingParts(dateText, schoolInfoText, nameText, recipientText);
-    var closingColumns = closingColumnCount(closingParts);
+    var closingChunks = buildClosingChunks(dateText, schoolInfoText, nameText, recipientText);
+    var allChunks = mainChunks.concat(closingChunks);
 
-    var result = paginate(mainChunks, closingColumns);
+    var result = paginateFlat(allChunks);
 
     letterPagesContainer.innerHTML = "";
-    result.pages.forEach(function (pageDesc, i) {
+    result.pages.forEach(function (pageChunks, i) {
       var block = document.createElement("div");
       block.className = "page-block";
 
@@ -664,7 +645,7 @@
         block.appendChild(label);
       }
 
-      block.appendChild(buildPageElement(pageDesc, closingParts));
+      block.appendChild(buildPageElement(pageChunks));
       letterPagesContainer.appendChild(block);
     });
 

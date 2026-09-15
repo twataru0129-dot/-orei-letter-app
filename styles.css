@@ -643,17 +643,9 @@ textarea:focus, .month-select:focus, input:focus, select:focus {
    hold --chars-per-column characters; 敬具 is 2 characters, and the
    rule asks for 2 blank character-cells below it before the column
    ends, so it starts (--chars-per-column - 2 - 2) characters down. */
-.letter-closing {
-  margin-top: calc(var(--col-font-size) * (var(--chars-per-column) - 4));
-  /* The shared rule above gives every column box the FULL column
-     height; adding margin-top on top of that would push this box's
-     own bottom edge past the page (harmless to look at since the
-     text itself still sits inside the page, but an invisible
-     out-of-bounds box can still intercept clicks on whatever sits
-     below it). Shrinking the height by the same amount keeps
-     margin + height equal to exactly one column again. */
-  height: calc(var(--usable-height) - (var(--col-font-size) * (var(--chars-per-column) - 4)));
-}
+/* 敬具・日付・学校情報・氏名・宛名の縦位置（下寄せ／上から2マス
+   空けるなど）は、内容ごとに必要なmargin-top/heightが変わるため
+   app.js側で1列ずつインラインstyleとして計算・設定している。 */
 
 /* ---------------- Letter actions ---------------- */
 
