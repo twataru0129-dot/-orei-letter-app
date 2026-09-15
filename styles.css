@@ -728,6 +728,33 @@ textarea:focus, .month-select:focus, input:focus, select:focus {
 }
 
 @media print {
+  /* ---- Reset every screen-only layout trick before printing ----
+     iOS/iPadOS Safari builds its print output from the SAME layout
+     engine used for on-screen scrolling/zooming, so anything left
+     over from the mobile preview (a horizontally scrolling container,
+     a flex row, a transform used to shrink the page to fit a phone
+     screen) can make Safari re-tile that leftover width/height into
+     extra printed pages — this, not the letter content itself, is
+     what produced "4 pages for a 1-page letter" with mostly blank
+     pages. Forcing every ancestor down to plain block boxes with
+     auto size and visible overflow removes anything for Safari to
+     paginate except the actual A4 sheets. */
+  html,
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: auto !important;
+    height: auto !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    /* See the color-scheme note below .letter-page — this is the
+       same fix applied at the document root as well, in case the
+       browser decides the print canvas color before it even reaches
+       descendant elements. */
+    color-scheme: light !important;
+  }
+
   .no-print {
     display: none !important;
   }
@@ -755,22 +782,45 @@ textarea:focus, .month-select:focus, input:focus, select:focus {
     padding: 0;
   }
 
-  .paper-wrap {
+  .paper-wrap,
+  .letter-pages {
+    /* Both the horizontal-scroll wrapper and the flex row it wraps
+       must become plain, unscrollable, untransformed block boxes for
+       print — page-break properties are unreliable on flex children
+       in WebKit, and a leftover overflow/scroll container is exactly
+       the kind of "extra content past the page edge" that triggers
+       Safari's page-tiling bug. The on-screen [2枚目][1枚目] row
+       (flex-direction: row-reverse) is a screen-only affordance; DOM
+       order is always page1, page2, page3… so switching to normal
+       block stacking here is what makes print/PDF come out in that
+       same 1→2→3 order. */
+    display: block !important;
+    width: auto !important;
+    height: auto !important;
+    max-width: none !important;
+    overflow: visible !important;
+    transform: none !important;
     padding: 0;
-    overflow: visible;
+    margin: 0;
+    gap: 0;
   }
 
-  .letter-pages {
-    /* Page-break properties are unreliable on flex children in print,
-       so switch to normal block stacking (one page-block per row) for
-       print output only; the screen preview keeps the flex row. */
-    display: block;
-    gap: 0;
+  /* A .letter-page that ended up with no rendered content (should not
+     normally happen — app.js always rebuilds the whole page list —
+     but kept as a safety net per the "never print a blank page"
+     requirement) is dropped from the print output entirely. */
+  .page-block:empty,
+  .letter-page:empty {
+    display: none !important;
   }
 
   .page-block {
     break-after: page;
     page-break-after: always;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    width: auto;
+    background: #ffffff !important;
   }
 
   .page-block:last-child {
@@ -780,11 +830,40 @@ textarea:focus, .month-select:focus, input:focus, select:focus {
 
   .letter-page {
     width: 210mm;
-    height: 297mm;
+    /* 297mm minus a hair. When the total printed content is an exact
+       multiple of the page height (e.g. exactly 2 or 3 full pages),
+       browsers' print pagination can round the page-break boundary
+       the wrong way and silently add one extra, nearly blank page at
+       the end. Shaving an imperceptible 1px off the page height gives
+       the layout a small amount of slack so the total content height
+       is always strictly less than an exact multiple of the page
+       height, which removes that boundary case entirely. The ruled
+       grid geometry is unaffected: it is derived from --page-margin,
+       not from this height. */
+    height: calc(297mm - 1px);
     border: none;
-    box-shadow: none;
+    box-shadow: none !important;
+    filter: none !important;
+    backdrop-filter: none !important;
+    transform: none !important;
     overflow: hidden;
     /* The page's own padding (--page-margin) already provides the
        printer-safe margin, so @page itself uses margin: 0 above. */
+
+    /* ---- Force a white sheet with black ink, regardless of the
+       device's dark-mode setting ----
+       iOS Safari renders the print preview using the system's current
+       appearance. Without an explicit color-scheme, a phone in Dark
+       Mode can print this page with a dark canvas behind it, and our
+       normal (comparatively dark) on-screen text color then reads as
+       near-black text on a near-black sheet — the "黒背景で文字が
+       見えない" symptom. Declaring color-scheme: light here, together
+       with an explicit white background and black text, makes the
+       printed sheet light regardless of the viewer's OS theme. */
+    color-scheme: light !important;
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
   }
 }
