@@ -158,7 +158,6 @@
   var printBtn = $("print-btn");
   var saveBtn = $("save-btn");
   var saveGuideModal = $("save-guide-modal");
-  var saveGuideTitle = $("save-guide-title");
   var saveGuideBody = $("save-guide-body");
   var saveGuideCancelBtn = $("save-guide-cancel-btn");
   var saveGuideActionBtn = $("save-guide-action-btn");
@@ -353,14 +352,17 @@
     window.print();
   });
 
-  /* ---------------- 保存（PDF／画像）の案内モーダル ----------------
-     PCでは従来どおり「PDFで保存」（案内モーダル→window.print()）。
-     iPhone/iPadでは、Safariの印刷・PDF化で空白ページや黒背景が
-     発生する問題があるため、便箋のページだけを画像として保存する
-     「画像で保存」に切り替える。中央のボタン（#save-btn）は同じ
-     要素のまま、端末に応じてラベルと動作だけを切り替える。
-     端末判定に失敗した場合も、必ずPDF保存側にフォールバックして
-     機能自体が壊れないようにする。 */
+  /* ---------------- 保存（画像）の案内モーダル ----------------
+     Windows・Mac・iPhone・iPadのすべてで、保存方法を「画像で保存」
+     （便箋のページをPNG画像として保存する）に統一している。以前は
+     PC側だけ「PDFで保存」（window.print()）を使っていたが、
+     MacBook・iPhone・iPadではSafariの印刷・PDF化でページ数が
+     増えたり黒背景になったりする問題があり、PC側でも保存結果が
+     不安定だったため、全端末で同じ画像保存方式に一本化した。
+     端末によって変えるのは保存の「受け渡し方」だけ：iPhone/iPad
+     ではWeb Share APIで共有シートを開き、PC/Macなどでは画像を
+     自動ダウンロードしたうえで、保存用のプレビューも表示する
+     （detectDeviceKindはこの受け渡し方の切り替えにのみ使う）。 */
 
   function detectDeviceKind() {
     try {
@@ -382,53 +384,27 @@
   }
 
   var deviceKind = detectDeviceKind();
-  var useImageSave = deviceKind === "ios";
 
-  saveBtn.textContent = useImageSave ? "画像で保存" : "PDFで保存";
-
-  function pdfGuideText(kind) {
-    var footer = "\n\n必要に応じて、分かりやすい名前を付けて保存してください。";
-
-    if (kind === "windows") {
+  function saveGuideText() {
+    if (deviceKind === "ios") {
       return (
-        "印刷画面が開きます。\n\n" +
-        "プリンターの選択で「Microsoft Print to PDF」または「PDFに保存」を選んでください。\n\n" +
-        "その後「印刷」または「保存」を押し、保存する場所とファイル名を決めてください。" +
-        footer
+        "便箋を画像にして保存します。\n\n" +
+        "このあと共有画面が開きます。\n\n" +
+        "「画像を保存」または「”ファイル”に保存」を選んでください。\n\n" +
+        "ページが2枚以上ある場合は、ページごとに画像が用意されます。"
       );
     }
-    if (kind === "ios") {
-      return (
-        "印刷画面が開きます。\n\n" +
-        "印刷プレビューから共有ボタン（□から↑が出ているマーク）を押してください。\n\n" +
-        "「”ファイル”に保存」を選ぶとPDFとして保存できます。\n\n" +
-        "共有ボタンが見つからない場合は、印刷プレビューを大きく表示してから共有ボタンを押してください。" +
-        footer
-      );
-    }
-    return "印刷画面が開きます。\n\n保存先・プリンターの選択で「PDFに保存」などを選んでください。" + footer;
-  }
-
-  function imageGuideText() {
     return (
-      "便箋を画像にして保存します。\n\n" +
-      "このあと共有画面が開きます。\n\n" +
-      "「画像を保存」または「”ファイル”に保存」を選んでください。\n\n" +
-      "ページが2枚以上ある場合は、ページごとに画像が用意されます。"
+      "便箋を画像ファイルとして保存します。\n\n" +
+      "このあと画像のダウンロードが始まります。\n\n" +
+      "ページが2枚以上ある場合は、ページごとに画像が保存されます。\n\n" +
+      "うまく保存できない場合は、続けて表示される画像の一覧からも保存できます。"
     );
   }
 
   function openSaveGuideModal() {
     hideSaveError();
-    if (useImageSave) {
-      saveGuideTitle.textContent = "画像で保存する";
-      saveGuideBody.textContent = imageGuideText();
-      saveGuideActionBtn.textContent = "画像を保存する";
-    } else {
-      saveGuideTitle.textContent = "PDFで保存する";
-      saveGuideBody.textContent = pdfGuideText(deviceKind);
-      saveGuideActionBtn.textContent = "PDF保存画面を開く";
-    }
+    saveGuideBody.textContent = saveGuideText();
     saveGuideModal.hidden = false;
     saveGuideActionBtn.focus();
   }
@@ -461,11 +437,7 @@
 
   saveGuideActionBtn.addEventListener("click", function () {
     closeSaveGuideModal();
-    if (useImageSave) {
-      saveAsImages();
-    } else {
-      window.print();
-    }
+    saveAsImages();
   });
 
   /* ---------------- 保存エラーの表示 ---------------- */
@@ -480,7 +452,7 @@
     saveErrorBox.hidden = true;
   }
 
-  /* ---------------- 画像で保存（iPhone/iPad向け） ----------------
+  /* ---------------- 画像で保存（全端末共通） ----------------
      便箋を画像化する方法として、最初はDOMをSVGのforeignObjectで
      複製し、それをcanvasへ描画してからPNG化する方式を試したが、
      foreignObjectを含むSVG画像をcanvasへ描画すると、その内容に
@@ -609,7 +581,11 @@
 
   function buildImageFilenameBase(pageNum, totalPages) {
     var namePart = state.name.trim().replace(/\s+/g, "");
+    var datePart = state.date ? state.date.replace(/-/g, "") : "";
     var base = "お礼状";
+    if (datePart) {
+      base += "_" + datePart;
+    }
     if (namePart) {
       base += "_" + namePart;
     }
@@ -716,8 +692,18 @@
       caption.className = "image-preview-caption";
       caption.textContent = file.name;
 
+      // 長押し保存できない環境（主にPC）向けに、画像ごとの保存
+      // リンクも用意しておく。iOS Safariではdownload属性は無視
+      // されるが、その場合は長押しで保存すればよい。
+      var saveLink = document.createElement("a");
+      saveLink.className = "btn btn-secondary image-preview-save-link";
+      saveLink.href = url;
+      saveLink.download = file.name;
+      saveLink.textContent = "この画像を保存";
+
       item.appendChild(img);
       item.appendChild(caption);
+      item.appendChild(saveLink);
       imagePreviewList.appendChild(item);
     });
 
@@ -736,6 +722,39 @@
       closeImagePreview();
     }
   });
+
+  // PC/Mac向け：一時的な<a download>リンクをクリックして、画像を
+  // 自動的にダウンロードする。ダウンロードの成否はJavaScriptからは
+  // 判定できないため、この後で必ず保存用プレビュー（手動保存の
+  // 手段）も表示する。
+  function downloadFile(file) {
+    var url = URL.createObjectURL(file);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = file.name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () {
+      URL.revokeObjectURL(url);
+    }, 2000);
+  }
+
+  function downloadFiles(files) {
+    var chain = Promise.resolve();
+    files.forEach(function (file) {
+      chain = chain.then(function () {
+        downloadFile(file);
+        // 複数枚を連続でダウンロードすると、ブラウザに「複数ファイル
+        // のダウンロード」としてブロックされることがあるため、
+        // 1枚ごとに少し間隔を空ける。
+        return new Promise(function (resolve) {
+          setTimeout(resolve, 350);
+        });
+      });
+    });
+    return chain;
+  }
 
   function saveAsImages() {
     hideSaveError();
@@ -761,13 +780,26 @@
         });
 
         return chain.then(function () {
-          return tryShareFiles(files).catch(function () {
-            return false;
-          });
-        }).then(function (shared) {
-          if (!shared) {
-            showImagePreview(files);
+          if (deviceKind === "ios") {
+            // iPhone/iPad：Web Share APIで共有シートを開く。共有が
+            // 使えない・失敗した場合はプレビューにフォールバックする。
+            return tryShareFiles(files).catch(function () {
+              return false;
+            }).then(function (shared) {
+              if (!shared) {
+                showImagePreview(files);
+              }
+            });
           }
+          // PC/Mac/その他：まず自動ダウンロードを試み、そのうえで
+          // 確認・手動保存の手段としてプレビューも表示する。
+          return downloadFiles(files).catch(function () {
+            // ダウンロード自体は失敗を検知できないため、ここに
+            // 来るのは想定外のエラー時のみ。プレビュー表示は
+            // 下の.then()で必ず行われる。
+          }).then(function () {
+            showImagePreview(files);
+          });
         });
       })
       .catch(function () {

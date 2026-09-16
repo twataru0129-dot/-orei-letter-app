@@ -666,7 +666,7 @@ textarea:focus, .month-select:focus, input:focus, select:focus {
   margin-top: 20px;
 }
 
-/* ---------------- PDF保存の案内モーダル ---------------- */
+/* ---------------- 画像保存の案内モーダル ---------------- */
 
 .modal-overlay {
   position: fixed;
@@ -718,7 +718,7 @@ textarea:focus, .month-select:focus, input:focus, select:focus {
   flex-wrap: wrap;
 }
 
-/* ---------------- 画像で保存（iPhone/iPad）のプレビュー ---------------- */
+/* ---------------- 画像で保存のプレビュー（全端末共通） ---------------- */
 
 .image-preview-box {
   max-width: 92vw;
@@ -749,6 +749,14 @@ textarea:focus, .month-select:focus, input:focus, select:focus {
   margin: 8px 0 0;
   font-size: 0.9rem;
   color: var(--text-sub);
+}
+
+.image-preview-save-link {
+  display: inline-flex;
+  margin-top: 10px;
+  min-height: 44px;
+  padding: 8px 20px;
+  font-size: 1rem;
 }
 
 /* ---------------- 保存エラーの表示 ---------------- */
