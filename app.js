@@ -349,6 +349,9 @@
   });
 
   printBtn.addEventListener("click", function () {
+    if (!requireCompanyOrShowError()) {
+      return;
+    }
     window.print();
   });
 
@@ -403,7 +406,9 @@
   }
 
   function openSaveGuideModal() {
-    hideSaveError();
+    if (!requireCompanyOrShowError()) {
+      return;
+    }
     saveGuideBody.textContent = saveGuideText();
     saveGuideModal.hidden = false;
     saveGuideActionBtn.focus();
@@ -451,6 +456,35 @@
   function hideSaveError() {
     saveErrorBox.hidden = true;
   }
+
+  /* ---------------- 実習先の会社名（必須）のチェック ----------------
+     清書画面には「実習先の会社名 必須」と表示されているが、これまで
+     会社名が空欄でも画像保存・印刷ができてしまっていた。「画像で
+     保存」「印刷する」のどちらも、押した時点で会社名が空欄なら
+     実行せず、分かりやすいメッセージを表示する。清書の「会社名＋
+     御中」の仕様（renderLetter内のrecipientText組み立て）や、
+     画面1→画面2の遷移チェックには一切手を加えていない。 */
+
+  var COMPANY_REQUIRED_MESSAGE = "実習先の会社名を入力してください。";
+
+  function requireCompanyOrShowError() {
+    if (!inputCompany.value.trim()) {
+      showSaveError(COMPANY_REQUIRED_MESSAGE);
+      inputCompany.focus();
+      return false;
+    }
+    hideSaveError();
+    return true;
+  }
+
+  // 会社名を入力し始めたら、表示中の「会社名が未入力」エラーは
+  // すぐに解除する（画像保存の失敗など、別の理由で出ているエラーは
+  // 誤って消さないよう、メッセージが一致する場合のみ消す）。
+  inputCompany.addEventListener("input", function () {
+    if (!saveErrorBox.hidden && saveErrorText.textContent === COMPANY_REQUIRED_MESSAGE && inputCompany.value.trim()) {
+      hideSaveError();
+    }
+  });
 
   /* ---------------- 画像で保存（全端末共通） ----------------
      便箋を画像化する方法として、最初はDOMをSVGのforeignObjectで
