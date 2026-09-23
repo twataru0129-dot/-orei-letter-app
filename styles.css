@@ -721,20 +721,59 @@ textarea:focus, .month-select:focus, input:focus, select:focus {
   color: var(--text-sub);
 }
 
+/* キーボード表示中でも、今どの欄を触っているか分かりやすいように、
+   フォーカスされた入力欄がスマホでも見える位置までスクロールできる
+   よう余白を確保しておく（sticky headerの高さぶん）。 */
+.envelope-form input {
+  scroll-margin-top: 100px;
+}
+
 .envelope-preview-wrap {
-  max-width: 960px;
+  max-width: 460px;
   margin: 0 auto 20px;
-  overflow-x: auto;
   text-align: center;
 }
 
-#envelope-canvas {
+/* 画面上のプレビューは「表面」「裏面」を切り替えて1面ずつ大きく
+   見せる（印刷・画像保存用のA4横1枚レイアウトとは別に用意している）。
+   スマートフォンでも文字が読みやすいサイズになる。 */
+.envelope-face-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.envelope-face-tab {
+  min-height: 44px;
+  padding: 8px 26px;
+  font-size: 1.05rem;
+  font-weight: bold;
+  border-radius: 999px;
+  border: 2px solid var(--accent);
+  background: #fff;
+  color: var(--accent-dark);
+  cursor: pointer;
+}
+
+.envelope-face-tab.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.envelope-preview-canvas {
   max-width: 100%;
   height: auto;
   border: 1px solid #ccc;
   border-radius: 4px;
   background: #ffffff;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+}
+
+/* 印刷・画像保存専用のcanvas（表面＋裏面をA4横1枚にまとめたもの）。
+   画面には表示せず、印刷時だけ@media printで表示する。 */
+.envelope-print-canvas {
+  display: none;
 }
 
 /* ---------------- 画像保存の案内モーダル ---------------- */
