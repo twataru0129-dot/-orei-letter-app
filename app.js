@@ -133,9 +133,10 @@
     date: "",
     grade: "1",
     name: "",
+    recipientType: "company", // "company" | "person"
+    recipientPersonName: "",
     envelopePostal: "",
-    envelopeAddress: "",
-    envelopeContact: ""
+    envelopeAddress: ""
   };
 
   /* ---------------- 要素取得 ---------------- */
@@ -154,9 +155,14 @@
   var errorBox = $("error-box");
 
   var inputCompany = $("input-company");
+  var companyHint = $("company-hint");
   var inputDate = $("input-date");
   var inputGrade = $("input-grade");
   var inputName = $("input-name");
+  var inputRecipientTypeCompany = $("input-recipient-type-company");
+  var inputRecipientTypePerson = $("input-recipient-type-person");
+  var recipientPersonRow = $("recipient-person-row");
+  var inputRecipientPersonName = $("input-recipient-person-name");
   var backBtn = $("back-btn");
   var printBtn = $("print-btn");
   var saveBtn = $("save-btn");
@@ -172,8 +178,10 @@
   var fitWarning = $("fit-warning");
   var scrollHint = $("scroll-hint");
   var paperWrap = $("paper-wrap");
+  var paperWrapCanvas = $("paper-wrap-canvas");
 
   var letterPagesContainer = $("letter-pages");
+  var letterPagesCanvasContainer = $("letter-pages-canvas");
 
   var step1 = $("step-1");
   var step2 = $("step-2");
@@ -181,10 +189,12 @@
 
   var gotoEnvelopeBtn = $("goto-envelope-btn");
   var envelopeCarryCompany = $("envelope-carry-company");
+  var envelopeCarrySuffixCompany = $("envelope-carry-suffix-company");
+  var envelopeCarryPersonRow = $("envelope-carry-person-row");
+  var envelopeCarryPerson = $("envelope-carry-person");
   var envelopeCarryName = $("envelope-carry-name");
   var inputEnvelopePostal = $("input-envelope-postal");
   var inputEnvelopeAddress = $("input-envelope-address");
-  var inputEnvelopeContact = $("input-envelope-contact");
   var envelopeErrorBox = $("envelope-error-box");
   var envelopeErrorText = $("envelope-error-text");
   var envelopeCanvas = $("envelope-canvas");
@@ -375,21 +385,29 @@
 
   gotoEnvelopeBtn.addEventListener("click", function () {
     var companyMissing = !state.company.trim();
+    var personMissing = state.recipientType === "person" && !state.recipientPersonName.trim();
     var nameMissing = !state.name.trim();
 
-    if (companyMissing && nameMissing) {
-      showSaveError("封筒を作るために、実習先の会社名と名前を入力してください。");
-      inputCompany.focus();
-      return;
-    }
+    var missingLabels = [];
     if (companyMissing) {
-      showSaveError("封筒を作るために、実習先の会社名を入力してください。");
-      inputCompany.focus();
-      return;
+      missingLabels.push("実習先の会社名");
+    }
+    if (personMissing) {
+      missingLabels.push("担当者名");
     }
     if (nameMissing) {
-      showSaveError("封筒を作るために、名前を入力してください。");
-      inputName.focus();
+      missingLabels.push("名前");
+    }
+
+    if (missingLabels.length > 0) {
+      showSaveError("封筒を作るために、" + missingLabels.join("と") + "を入力してください。");
+      if (companyMissing) {
+        inputCompany.focus();
+      } else if (personMissing) {
+        inputRecipientPersonName.focus();
+      } else {
+        inputName.focus();
+      }
       return;
     }
     hideSaveError();
@@ -612,14 +630,9 @@
     renderEnvelope();
   });
 
-  inputEnvelopeContact.addEventListener("input", function () {
-    state.envelopeContact = inputEnvelopeContact.value;
-    renderEnvelope();
-  });
-
   // スマホでキーボード表示中も、今どの欄を触っているか分かるよう、
   // フォーカスした入力欄が隠れないところまでスクロールする。
-  [inputEnvelopePostal, inputEnvelopeAddress, inputEnvelopeContact].forEach(function (el) {
+  [inputEnvelopePostal, inputEnvelopeAddress].forEach(function (el) {
     el.addEventListener("focus", function () {
       window.setTimeout(function () {
         el.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -673,6 +686,7 @@
      外部ライブラリ・CDNは使用していない。 */
 
   var SAVE_IMAGE_SCALE = 3; // 印刷見本として使えるよう高解像度で書き出す
+  var LETTER_PREVIEW_SCALE = 2; // 画面プレビュー（Canvas）用の解像度
   var MM_TO_PX_BASE = 96 / 25.4;
   var SAVE_FONT_FAMILY =
     '"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic","YuGothic","Meiryo",' +
@@ -1203,6 +1217,29 @@
     return columns;
   }
 
+  // 封筒表面の住所を「できるだけ1列に収める」ための最大文字数を、
+  // 書き始めのY座標・1文字あたりの縦方向ピッチ・封筒の高さ・下側の
+  // 余白（約5マス分）から逆算する。固定の20文字などで単純に区切ら
+  // ないことで、短い住所は途中で改列せず1列に収まるようにする。
+  var ENVELOPE_ADDRESS_BOTTOM_GAP_CHARS = 5;
+
+  // 実習先住所（封筒表面）の列ごとの表示データを組み立てる。1列目
+  // は従来どおり書き始め位置（topYLocal）から書くが、2列目以降は
+  // 「残った住所の最後の文字が下から約5マス空けた位置に来る」ように
+  // 開始Y座標を逆算し、上詰めではなく下揃えで表示する。
+  function layoutFrontAddressColumns(text, topYLocal, charPitchMm) {
+    var bottomLimitYLocal = ENVELOPE_H_MM - ENVELOPE_ADDRESS_BOTTOM_GAP_CHARS * charPitchMm;
+    var maxChars = Math.max(1, Math.floor((bottomLimitYLocal - topYLocal) / charPitchMm));
+    var columns = splitAddressIntoColumns(text, maxChars);
+    return columns.map(function (chunk, i) {
+      if (i === 0) {
+        return { text: chunk, topYLocal: topYLocal };
+      }
+      var charCount = Array.from(chunk).length;
+      return { text: chunk, topYLocal: bottomLimitYLocal - charCount * charPitchMm };
+    });
+  }
+
   // 郵便番号を「〒338-0824」のような通常の文字列表記にする
   // （裏面の学校郵便番号など、7枠ではなく文字列で見せたい場合に使う）。
   function formatPostalDisplay(rawDigits) {
@@ -1318,20 +1355,25 @@
     // 実習先の郵便番号
     envDrawPostalBoxes(ctx, toPx, faceScale, mmToPx, 48, 16, envelopePostalDigits(state.envelopePostal));
 
-    // 実習先の住所（縦書き、右寄りの列。長い場合は左隣の列へ続ける。
-    // 数字＋ハイフンや「丁目」「番地」が不自然に分かれないよう、
-    // splitAddressIntoColumnsで自然な位置で折り返す）
-    var addressChunks = splitAddressIntoColumns(state.envelopeAddress.trim(), 20);
-    addressChunks.forEach(function (chunk, i) {
-      envDrawVerticalColumn(ctx, toPx, chunk, 103 - i * 9, 45, 5.2, 4.2, faceScale, mmToPx, false);
+    // 実習先の住所（縦書き、右寄りの列）。よほど長い住所でない限り
+    // 1列に収め、本当に収まらない場合だけ左隣の列へ続ける。2列目
+    // 以降は上詰めではなく、残りの文字数から逆算した下揃えにする
+    // （layoutFrontAddressColumns）。数字＋ハイフンや「丁目」「番地」
+    // が不自然に分かれないようにする分割ロジック自体は維持する。
+    var addressColumns = layoutFrontAddressColumns(state.envelopeAddress.trim(), 45, 5.2);
+    addressColumns.forEach(function (col, i) {
+      envDrawVerticalColumn(ctx, toPx, col.text, 103 - i * 9, col.topYLocal, 5.2, 4.2, faceScale, mmToPx, false);
     });
 
     // 会社名・宛名（縦書き、住所より大きい文字。住所列との間隔を
     // 広めに取り、会社名がやや中央寄りに見えるようにする）。
-    // 「御中」「担当者名」「様」は会社名と同じ高さから書き始めるの
-    // ではなく、少しずつ下げて書き始めることで、封筒らしい自然な
-    // 見た目にする（1マス＝文字の縦方向のピッチを基準に下げる）。
-    var contact = state.envelopeContact.trim();
+    // 会社あて：会社名の左隣に「御中」。個人あて：会社名の左隣に
+    // 「担当者名＋様」を1つの列にまとめて表示する（担当者名と様を
+    // 別々の列に分けない）。どちらも会社名と同じ高さから書き始める
+    // のではなく、少し下げて書き始めることで封筒らしい自然な見た目
+    // にする（1マス＝文字の縦方向のピッチを基準に下げる）。
+    var isPersonRecipient = state.recipientType === "person";
+    var personName = state.recipientPersonName.trim();
     var company = state.company.trim();
     var addresseeCellMm = 7.8;
     var baseYLocal = 55;
@@ -1343,16 +1385,15 @@
       colX -= 10;
     });
 
-    if (contact) {
-      // 担当者名（会社名の左隣。会社名より少し下げて書き始める）
-      var contactYLocal = baseYLocal + addresseeCellMm * 1.5;
-      envChunkText(contact, 14).forEach(function (chunk) {
-        envDrawVerticalColumn(ctx, toPx, chunk, colX, contactYLocal, addresseeCellMm, 6.4, faceScale, mmToPx, true);
+    if (isPersonRecipient) {
+      // 担当者名＋様（会社名の左隣。同じ列の中に連続して表示し、
+      // 会社名より少し下げて書き始める）
+      var personYLocal = baseYLocal + addresseeCellMm * 1.5;
+      var personLine = personName ? personName + "　様" : "";
+      envChunkText(personLine, 14).forEach(function (chunk) {
+        envDrawVerticalColumn(ctx, toPx, chunk, colX, personYLocal, addresseeCellMm, 6.4, faceScale, mmToPx, true);
         colX -= 10;
       });
-      // 様（担当者名のさらに左隣。担当者名よりさらに少し下げる）
-      var samaYLocal = contactYLocal + addresseeCellMm;
-      envDrawVerticalColumn(ctx, toPx, "様", colX, samaYLocal, addresseeCellMm, 6.4, faceScale, mmToPx, true);
     } else {
       // 御中（会社名の左隣。会社名より少し下げて書き始める）
       var chudoYLocal = baseYLocal + addresseeCellMm * 2;
@@ -1478,6 +1519,14 @@
   function renderEnvelope() {
     envelopeCarryCompany.textContent = state.company.trim() || "（未入力）";
     envelopeCarryName.textContent = state.name.trim() || "（未入力）";
+    if (state.recipientType === "person") {
+      envelopeCarrySuffixCompany.hidden = true;
+      envelopeCarryPersonRow.hidden = false;
+      envelopeCarryPerson.textContent = state.recipientPersonName.trim() || "（未入力）";
+    } else {
+      envelopeCarrySuffixCompany.hidden = false;
+      envelopeCarryPersonRow.hidden = true;
+    }
     drawEnvelopeSingleFace(envelopePreviewCanvas, envelopePreviewFace, ENVELOPE_PREVIEW_SCALE);
   }
 
@@ -1510,6 +1559,36 @@
     state.name = inputName.value;
     renderLetter();
   });
+
+  // 「だれに送りますか？」（会社あて／個人あて）。個人あてのときだけ
+  // 担当者名欄を表示し、清書の宛名（御中／担当者名＋様）を切り替える。
+  // 会社あてに戻しても担当者名の入力値はstateに残すが（同じセッション
+  // 中の再入力を避けるため）、出力（清書・封筒）には使わない。
+  function applyRecipientType() {
+    var isPerson = state.recipientType === "person";
+    recipientPersonRow.hidden = !isPerson;
+    companyHint.textContent = isPerson
+      ? "会社名のみを入力してください（「御中」は付きません）。"
+      : "清書では自動的に「御中」が付きます。";
+  }
+
+  [inputRecipientTypeCompany, inputRecipientTypePerson].forEach(function (radio) {
+    radio.addEventListener("change", function () {
+      if (!radio.checked) {
+        return;
+      }
+      state.recipientType = radio.value;
+      applyRecipientType();
+      renderLetter();
+    });
+  });
+
+  inputRecipientPersonName.addEventListener("input", function () {
+    state.recipientPersonName = inputRecipientPersonName.value;
+    renderLetter();
+  });
+
+  applyRecipientType();
 
   /* ---------------- 令和変換（漢数字） ---------------- */
 
@@ -1771,7 +1850,13 @@
     var schoolInfoText = schoolText + "　" + deptGradeText;
     var nameText = state.name.trim();
     var companyText = state.company.trim();
-    var recipientText = companyText ? companyText + "　御中" : "";
+    var recipientText = "";
+    if (state.recipientType === "person") {
+      var personNameText = state.recipientPersonName.trim();
+      recipientText = companyText && personNameText ? companyText + "　" + personNameText + "　様" : "";
+    } else {
+      recipientText = companyText ? companyText + "　御中" : "";
+    }
 
     var closingChunks = buildClosingChunks(dateText, schoolInfoText, nameText, recipientText);
     var allChunks = mainChunks.concat(closingChunks);
@@ -1779,6 +1864,7 @@
     var result = paginateFlat(allChunks);
     lastRenderedPages = result.pages;
 
+    // 印刷用DOM（従来どおり。@media printでのみ表示される）。
     letterPagesContainer.innerHTML = "";
     result.pages.forEach(function (pageChunks, i) {
       var block = document.createElement("div");
@@ -1795,6 +1881,27 @@
       letterPagesContainer.appendChild(block);
     });
 
+    // 画面プレビュー用Canvas。画像保存と同じrenderPageCanvasで描画
+    // するため、CSSのline-height頼みで生じていた「後半ほど文字が
+    // ずれる」誤差がなく、保存されるPNGと常に同じ文字位置になる。
+    letterPagesCanvasContainer.innerHTML = "";
+    result.pages.forEach(function (pageChunks, i) {
+      var block = document.createElement("div");
+      block.className = "page-block";
+
+      if (result.pages.length > 1) {
+        var label = document.createElement("p");
+        label.className = "page-label";
+        label.textContent = (i + 1) + "枚目 ／ 全" + result.pages.length + "枚";
+        block.appendChild(label);
+      }
+
+      var canvas = renderPageCanvas(pageChunks, LETTER_PREVIEW_SCALE);
+      canvas.className = "letter-page-canvas";
+      block.appendChild(canvas);
+      letterPagesCanvasContainer.appendChild(block);
+    });
+
     fitWarning.hidden = !result.truncated;
 
     checkFit();
@@ -1806,22 +1913,22 @@
     // の順）に表示されるので、プレビューを開いた直後からページ1が
     // 見えるよう、横スクロール位置を右端（＝末尾）へ合わせておく。
     window.requestAnimationFrame(function () {
-      if (paperWrap) {
-        paperWrap.scrollLeft = paperWrap.scrollWidth;
+      if (paperWrapCanvas) {
+        paperWrapCanvas.scrollLeft = paperWrapCanvas.scrollWidth;
       }
     });
   }
 
   function checkFit() {
     window.requestAnimationFrame(function () {
-      if (!paperWrap || !letterPagesContainer) {
+      if (!paperWrapCanvas || !letterPagesCanvasContainer) {
         return;
       }
       // 便箋はA4の実寸幅で表示しているため、スマートフォンなど
       // 画面が狭い端末では横スクロールが必要になる。これは内容が
       // はみ出しているのではなく、単に画面が便箋より狭いだけなので
       // fit-warning ではなく案内（scroll-hint）で知らせる。
-      var needsScroll = letterPagesContainer.scrollWidth > paperWrap.clientWidth + 2;
+      var needsScroll = letterPagesCanvasContainer.scrollWidth > paperWrapCanvas.clientWidth + 2;
       scrollHint.hidden = !needsScroll;
     });
   }

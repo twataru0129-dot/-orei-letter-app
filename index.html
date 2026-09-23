@@ -148,14 +148,35 @@
       </div>
 
       <div class="letter-form no-print">
+        <div class="form-row form-row-full">
+          <span class="form-row-legend">だれに送りますか？</span>
+          <div class="recipient-type-choice" role="radiogroup" aria-label="だれに送りますか？">
+            <label class="recipient-type-option">
+              <input type="radio" name="recipient-type" id="input-recipient-type-company" value="company" checked>
+              会社あて
+            </label>
+            <label class="recipient-type-option">
+              <input type="radio" name="recipient-type" id="input-recipient-type-person" value="person">
+              個人あて
+            </label>
+          </div>
+        </div>
         <div class="form-row">
           <label for="input-company">実習先の会社名 <span class="required">必須</span></label>
           <input type="text" id="input-company" placeholder="（例）ワタキューセイモア株式会社">
-          <p class="form-hint">清書では自動的に「御中」が付きます。</p>
+          <p class="form-hint" id="company-hint">清書では自動的に「御中」が付きます。</p>
         </div>
         <div class="form-row">
           <label for="input-date">日付</label>
           <input type="date" id="input-date">
+        </div>
+        <div class="form-row form-row-full" id="recipient-person-row" hidden>
+          <label for="input-recipient-person-name">担当者名（敬称略） <span class="required">必須</span></label>
+          <div class="recipient-person-input-wrap">
+            <input type="text" id="input-recipient-person-name" placeholder="（例）増澤">
+            <span class="recipient-person-suffix">様</span>
+          </div>
+          <p class="form-hint">「様」は入力しないでください。自動で付きます。</p>
         </div>
         <div class="form-row">
           <label for="input-grade">学年</label>
@@ -177,6 +198,18 @@
 
       <p id="scroll-hint" class="scroll-hint no-print" hidden>← 横にスクロールすると、便箋全体を確認できます →</p>
 
+      <!-- 画面上のプレビューは、HTML/CSSの縦書きではなく、画像保存と
+           まったく同じCanvas描画（renderPageCanvas）を使う。フォントの
+           縦方向の実測間隔がCSSのline-height指定とは完全に一致しない
+           ことがあり、それが原因で後半の行ほど文字位置がずれて見える
+           問題があったため、保存画像と常に一致するCanvas表示に統一
+           した（印刷は従来どおり下のDOM版 #paper-wrap を使う）。 -->
+      <div class="paper-wrap-canvas no-print" id="paper-wrap-canvas">
+        <div id="letter-pages-canvas" class="letter-pages-canvas"></div>
+      </div>
+
+      <!-- 印刷専用（画面には表示しない）。ブラウザの印刷機能で使う
+           A4縦の便箋DOMはこれまでどおりここで生成する。 -->
       <div class="paper-wrap" id="paper-wrap">
         <div id="letter-pages" class="letter-pages"></div>
       </div>
@@ -203,8 +236,11 @@
       </div>
 
       <div class="envelope-carry no-print">
-        <p>実習先：<strong id="envelope-carry-company"></strong></p>
-        <p>氏名：<strong id="envelope-carry-name"></strong></p>
+        <p class="envelope-carry-label">宛先：</p>
+        <p><strong id="envelope-carry-company"></strong><span id="envelope-carry-suffix-company">　御中</span></p>
+        <p id="envelope-carry-person-row" hidden><strong id="envelope-carry-person"></strong>　様</p>
+        <p class="envelope-carry-sender">氏名：<strong id="envelope-carry-name"></strong></p>
+        <p class="envelope-carry-hint">宛先を直す場合は「清書にもどる」から修正してください。</p>
       </div>
 
       <div class="envelope-form no-print">
@@ -215,10 +251,6 @@
         <div class="form-row">
           <label for="input-envelope-address">実習先の住所 <span class="required">必須</span></label>
           <input type="text" id="input-envelope-address" placeholder="（例）埼玉県さいたま市桜区〇〇1-2-3">
-        </div>
-        <div class="form-row">
-          <label for="input-envelope-contact">担当者名（分かる場合のみ）</label>
-          <input type="text" id="input-envelope-contact" placeholder="（例）山田 太郎">
         </div>
       </div>
 
