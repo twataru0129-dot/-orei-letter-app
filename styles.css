@@ -491,6 +491,52 @@ textarea:focus, .month-select:focus, input:focus, select:focus {
   margin-bottom: 6px;
 }
 
+.form-row-full {
+  grid-column: 1 / -1;
+}
+
+.form-row-legend {
+  display: block;
+  font-weight: bold;
+  margin-bottom: 6px;
+}
+
+.recipient-type-choice {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.recipient-type-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 1.05rem;
+  font-weight: normal;
+  min-height: 48px;
+}
+
+.recipient-type-option input {
+  width: 22px;
+  height: 22px;
+}
+
+.recipient-person-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.recipient-person-input-wrap input {
+  flex: 1 1 auto;
+}
+
+.recipient-person-suffix {
+  font-size: 1.1rem;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
 .required {
   background: #d9534f;
   color: #fff;
@@ -548,10 +594,12 @@ textarea:focus, .month-select:focus, input:focus, select:focus {
    more than one sheet's worth of columns, app.js creates additional
    .letter-page elements with the identical fixed grid. */
 
+/* #paper-wrap／.letter-pages（DOM版の便箋）は印刷専用。画面上の
+   プレビューは下の.paper-wrap-canvas／.letter-pages-canvasを使う
+   （@media print側の`.paper-wrap, .letter-pages`のdisplay:block
+   !importantで印刷時だけ表示される）。 */
 .paper-wrap {
-  display: flex;
-  overflow-x: auto;
-  padding: 10px 0 20px;
+  display: none;
 }
 
 .letter-pages {
@@ -564,6 +612,32 @@ textarea:focus, .month-select:focus, input:focus, select:focus {
   flex-direction: row-reverse;
   gap: 18px;
   margin: 0 auto;
+}
+
+/* 画面プレビュー用（Canvas版）。DOM版と同じ横スクロール・
+   右から左のページ並びを再現する。 */
+.paper-wrap-canvas {
+  display: flex;
+  overflow-x: auto;
+  padding: 10px 0 20px;
+}
+
+.letter-pages-canvas {
+  display: flex;
+  flex-direction: row-reverse;
+  gap: 18px;
+  margin: 0 auto;
+}
+
+.letter-page-canvas {
+  display: block;
+  background-color: #fffdf8;
+  border: 1px solid #ccc;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+  box-sizing: border-box;
+  width: 210mm;
+  height: 297mm;
+  max-width: none;
 }
 
 .page-block {
@@ -693,6 +767,22 @@ textarea:focus, .month-select:focus, input:focus, select:focus {
 .envelope-carry p {
   margin: 4px 0;
   font-size: 1rem;
+}
+
+.envelope-carry-label {
+  font-weight: bold;
+  color: var(--text-sub);
+}
+
+.envelope-carry-sender {
+  margin-top: 10px !important;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.envelope-carry-hint {
+  font-size: 0.85rem;
+  color: var(--text-sub);
 }
 
 .envelope-form {
