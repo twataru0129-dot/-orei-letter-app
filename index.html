@@ -229,7 +229,12 @@
       <p class="envelope-note no-print">この見本は、実際の封筒（長形3号）に手書きするための参考です。この用紙にそのまま宛先を印刷して送ることはできません。</p>
 
       <div class="envelope-preview-wrap">
-        <canvas id="envelope-canvas"></canvas>
+        <div class="envelope-face-tabs no-print" role="tablist">
+          <button type="button" id="envelope-tab-front" class="envelope-face-tab active" role="tab" aria-selected="true">表面</button>
+          <button type="button" id="envelope-tab-back" class="envelope-face-tab" role="tab" aria-selected="false">裏面</button>
+        </div>
+        <canvas id="envelope-preview-canvas" class="envelope-preview-canvas no-print"></canvas>
+        <canvas id="envelope-canvas" class="envelope-print-canvas"></canvas>
       </div>
 
       <div class="letter-actions no-print">

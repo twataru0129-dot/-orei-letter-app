@@ -188,6 +188,9 @@
   var envelopeErrorBox = $("envelope-error-box");
   var envelopeErrorText = $("envelope-error-text");
   var envelopeCanvas = $("envelope-canvas");
+  var envelopePreviewCanvas = $("envelope-preview-canvas");
+  var envelopeTabFront = $("envelope-tab-front");
+  var envelopeTabBack = $("envelope-tab-back");
   var envelopeBackBtn = $("envelope-back-btn");
   var envelopeSaveBtn = $("envelope-save-btn");
   var envelopePrintBtn = $("envelope-print-btn");
@@ -371,7 +374,20 @@
   });
 
   gotoEnvelopeBtn.addEventListener("click", function () {
-    if (!state.name.trim()) {
+    var companyMissing = !state.company.trim();
+    var nameMissing = !state.name.trim();
+
+    if (companyMissing && nameMissing) {
+      showSaveError("封筒を作るために、実習先の会社名と名前を入力してください。");
+      inputCompany.focus();
+      return;
+    }
+    if (companyMissing) {
+      showSaveError("封筒を作るために、実習先の会社名を入力してください。");
+      inputCompany.focus();
+      return;
+    }
+    if (nameMissing) {
       showSaveError("封筒を作るために、名前を入力してください。");
       inputName.focus();
       return;
@@ -601,10 +617,40 @@
     renderEnvelope();
   });
 
+  // スマホでキーボード表示中も、今どの欄を触っているか分かるよう、
+  // フォーカスした入力欄が隠れないところまでスクロールする。
+  [inputEnvelopePostal, inputEnvelopeAddress, inputEnvelopeContact].forEach(function (el) {
+    el.addEventListener("focus", function () {
+      window.setTimeout(function () {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 300);
+    });
+  });
+
+  // 画面上のプレビューは「表面」「裏面」をタブで切り替えて1面ずつ
+  // 大きく表示する（印刷・画像保存用のA4横1枚レイアウトとは別物）。
+  function setEnvelopePreviewFace(face) {
+    envelopePreviewFace = face;
+    envelopeTabFront.classList.toggle("active", face === "front");
+    envelopeTabFront.setAttribute("aria-selected", face === "front" ? "true" : "false");
+    envelopeTabBack.classList.toggle("active", face === "back");
+    envelopeTabBack.setAttribute("aria-selected", face === "back" ? "true" : "false");
+    drawEnvelopeSingleFace(envelopePreviewCanvas, envelopePreviewFace, ENVELOPE_PREVIEW_SCALE);
+  }
+
+  envelopeTabFront.addEventListener("click", function () {
+    setEnvelopePreviewFace("front");
+  });
+
+  envelopeTabBack.addEventListener("click", function () {
+    setEnvelopePreviewFace("back");
+  });
+
   envelopePrintBtn.addEventListener("click", function () {
     if (!requireEnvelopeFieldsOrShowError()) {
       return;
     }
+    drawEnvelopeSheet(envelopeCanvas, ENVELOPE_IMAGE_SCALE);
     dynamicPageStyle.textContent = "@page { size: A4 landscape; margin: 0; }";
     window.print();
   });
@@ -770,7 +816,11 @@
     return !!err && err.name === "AbortError";
   }
 
-  function tryShareFiles(files) {
+  // shareMetaは { title, text, textForPage } の形で、便箋・封筒で
+  // 共有時のタイトル・説明文を切り替えるために呼び出し側が渡す。
+  // textForPageは複数ファイルを1枚ずつ共有するときだけ使う（省略時
+  // はtextをそのまま使う）。
+  function tryShareFiles(files, shareMeta) {
     if (!navigator.share || !navigator.canShare) {
       return Promise.resolve(false);
     }
@@ -778,8 +828,8 @@
       if (navigator.canShare({ files: files })) {
         return navigator.share({
           files: files,
-          title: "お礼状",
-          text: "お礼状の便箋画像です。"
+          title: shareMeta.title,
+          text: shareMeta.text
         }).then(function () {
           return true;
         }).catch(function (err) {
@@ -804,8 +854,8 @@
             }
             return navigator.share({
               files: [file],
-              title: "お礼状",
-              text: "お礼状の便箋画像（" + (i + 1) + "枚目）です。"
+              title: shareMeta.title,
+              text: shareMeta.textForPage ? shareMeta.textForPage(i) : shareMeta.text
             }).catch(function (err) {
               if (isShareCancel(err)) {
                 cancelled = true;
@@ -917,8 +967,8 @@
   // の配列を返す（同期のPromiseチェーンでもよい）関数、triggerBtnは
   // 保存中に文字を変える対象のボタン、onErrorは失敗時に呼ぶエラー
   // 表示関数（画面2/画面3のどちらのエラー表示を使うか呼び出し側が
-  // 決める）。
-  function saveGeneratedImages(buildFilesFn, triggerBtn, onError) {
+  // 決める）、shareMetaはiPhone/iPadで共有するときのタイトル・説明文。
+  function saveGeneratedImages(buildFilesFn, triggerBtn, onError, shareMeta) {
     var originalLabel = triggerBtn.textContent;
     triggerBtn.disabled = true;
     triggerBtn.textContent = "画像を作成中…";
@@ -932,7 +982,7 @@
         if (deviceKind === "ios") {
           // iPhone/iPad：Web Share APIで共有シートを開く。共有が
           // 使えない・失敗した場合はプレビューにフォールバックする。
-          return tryShareFiles(files).catch(function () {
+          return tryShareFiles(files, shareMeta).catch(function () {
             return false;
           }).then(function (shared) {
             if (!shared) {
@@ -978,7 +1028,13 @@
       return chain.then(function () {
         return files;
       });
-    }, saveBtn, showSaveError);
+    }, saveBtn, showSaveError, {
+      title: "お礼状",
+      text: "お礼状の便箋画像です。",
+      textForPage: function (i) {
+        return "お礼状の便箋画像（" + (i + 1) + "枚目）です。";
+      }
+    });
   }
 
   function saveEnvelopeAsImage() {
@@ -988,7 +1044,10 @@
       return canvasToPngBlob(envelopeCanvas).then(function (blob) {
         return [new File([blob], buildEnvelopeFilenameBase() + ".png", { type: "image/png" })];
       });
-    }, envelopeSaveBtn, showEnvelopeError);
+    }, envelopeSaveBtn, showEnvelopeError, {
+      title: "封筒見本",
+      text: "封筒の見本画像です。"
+    });
   }
 
   /* ---------------- 封筒の見本（v1.1で追加） ----------------
@@ -1012,6 +1071,8 @@
   var ENVELOPE_LABEL_MM = 12;
   var ENVELOPE_GAP_MM = 14;
   var ENVELOPE_IMAGE_SCALE = 3; // 印刷見本として使えるよう高解像度で描画する
+  var ENVELOPE_PREVIEW_SCALE = 2; // 画面プレビュー（1面ずつ表示）用の解像度
+  var envelopePreviewFace = "front"; // 画面プレビューで今表示している面
 
   // 学校の固定情報（封筒裏面用）。お礼状清書で使っている学校名
   // 「さいたま桜高等学園」とは別に、封筒裏面では正式な学校名を使う
@@ -1032,6 +1093,90 @@
       chunks.push(chars.slice(i, i + maxChars).join(""));
     }
     return chunks;
+  }
+
+  // 住所を列（縦書き）に分割する。envChunkTextのような単純な文字数
+  // 区切りだと「1-2-3」のような数字＋ハイフンの途中や「丁目」
+  // 「番地」の途中で不自然に列が変わったり、最後の列が1文字だけに
+  // なったりしてしまう。完璧な住所解析は不要なので、数字・ハイフン
+  // の並びや「丁目」「番地」をひとまとまり（アトム）として崩さずに
+  // 詰めていく簡易的なロジックで、見た目の自然さだけを改善する。
+  function splitAddressIntoColumns(text, maxChars) {
+    var chars = text ? Array.from(text) : [];
+    if (chars.length === 0) {
+      return [""];
+    }
+
+    var NUM_RE = /^[0-9０-９\-－ー]$/;
+    var KANA_RE = /^[゠-ヿ]$/;
+    var atoms = [];
+    var i = 0;
+    while (i < chars.length) {
+      var ch = chars[i];
+      if ((ch === "丁" && chars[i + 1] === "目") || (ch === "番" && chars[i + 1] === "地")) {
+        atoms.push(chars[i] + chars[i + 1]);
+        i += 2;
+        continue;
+      }
+      if (NUM_RE.test(ch)) {
+        var j = i;
+        while (j < chars.length && NUM_RE.test(chars[j])) {
+          j++;
+        }
+        atoms.push(chars.slice(i, j).join(""));
+        i = j;
+        continue;
+      }
+      if (KANA_RE.test(ch)) {
+        var k = i;
+        while (k < chars.length && KANA_RE.test(chars[k])) {
+          k++;
+        }
+        atoms.push(chars.slice(i, k).join(""));
+        i = k;
+        continue;
+      }
+      atoms.push(ch);
+      i++;
+    }
+
+    // アトムを崩さずに、maxChars文字以内へ貪欲に詰めていく。
+    var columns = [];
+    var current = "";
+    atoms.forEach(function (atom) {
+      if (current.length > 0 && current.length + atom.length > maxChars) {
+        columns.push(current);
+        current = atom;
+      } else {
+        current += atom;
+      }
+    });
+    if (current.length > 0) {
+      columns.push(current);
+    }
+
+    // 最後の列が1文字だけの孤立した列にならないよう、可能なら
+    // ひとつ前の列から1文字分けてもらう。
+    if (columns.length >= 2 && Array.from(columns[columns.length - 1]).length === 1) {
+      var prevChars = Array.from(columns[columns.length - 2]);
+      if (prevChars.length > 1) {
+        var moved = prevChars.pop();
+        columns[columns.length - 2] = prevChars.join("");
+        columns[columns.length - 1] = moved + columns[columns.length - 1];
+      }
+    }
+
+    return columns;
+  }
+
+  // 郵便番号を「〒338-0824」のような通常の文字列表記にする
+  // （裏面の学校郵便番号など、7枠ではなく文字列で見せたい場合に使う）。
+  function formatPostalDisplay(rawDigits) {
+    var digits = (rawDigits || "").replace(/[^0-9]/g, "");
+    if (digits.length !== 7) {
+      return "〒" + digits;
+    }
+    return "〒" + digits.slice(0, 3) + "-" + digits.slice(3);
   }
 
   // 縦書きで1文字描画する。text-orientation: mixed の縦書きで90度
@@ -1070,6 +1215,17 @@
       var bottom = toPx(centerXLocal, topYLocal + (i + 1) * charPitchLocalMm);
       envDrawChar(ctx, ch, top[0], top[1], bottom[1] - top[1], fontPx);
     });
+  }
+
+  // 郵便番号の文字列表記など、横書きで短い文字列を描画する。
+  function envDrawHorizontalText(ctx, toPx, text, xLocal, yLocal, fontSizeLocalMm, faceScale, mmToPx, bold, align) {
+    var fontPx = fontSizeLocalMm * faceScale * mmToPx;
+    ctx.font = (bold ? "bold " : "") + fontPx + "px " + SAVE_FONT_FAMILY;
+    ctx.fillStyle = "#000000";
+    ctx.textAlign = align || "left";
+    ctx.textBaseline = "middle";
+    var p = toPx(xLocal, yLocal);
+    ctx.fillText(text, p[0], p[1]);
   }
 
   // 郵便番号の枠（3桁＋4桁、計7マス）を描画する。startXLocal/startYLocal
@@ -1123,17 +1279,20 @@
     // 実習先の郵便番号
     envDrawPostalBoxes(ctx, toPx, faceScale, mmToPx, 48, 16, envelopePostalDigits(state.envelopePostal));
 
-    // 実習先の住所（縦書き、右寄りの列。長い場合は左隣の列へ続ける）
-    var addressChunks = envChunkText(state.envelopeAddress.trim(), 20);
+    // 実習先の住所（縦書き、右寄りの列。長い場合は左隣の列へ続ける。
+    // 数字＋ハイフンや「丁目」「番地」が不自然に分かれないよう、
+    // splitAddressIntoColumnsで自然な位置で折り返す）
+    var addressChunks = splitAddressIntoColumns(state.envelopeAddress.trim(), 20);
     addressChunks.forEach(function (chunk, i) {
-      envDrawVerticalColumn(ctx, toPx, chunk, 100 - i * 9, 45, 5.2, 4.2, faceScale, mmToPx, false);
+      envDrawVerticalColumn(ctx, toPx, chunk, 103 - i * 9, 45, 5.2, 4.2, faceScale, mmToPx, false);
     });
 
-    // 会社名・宛名（縦書き、住所より大きい文字。中央寄りの列）
+    // 会社名・宛名（縦書き、住所より大きい文字。住所列との間隔を
+    // 広めに取り、会社名がやや中央寄りに見えるようにする）
     var contact = state.envelopeContact.trim();
     var company = state.company.trim();
     var segments = contact ? [company, contact + "　様"] : [company, "御中"];
-    var colX = 78;
+    var colX = 65;
     segments.forEach(function (seg) {
       envChunkText(seg, 14).forEach(function (chunk) {
         envDrawVerticalColumn(ctx, toPx, chunk, colX, 55, 7.8, 6.4, faceScale, mmToPx, true);
@@ -1155,25 +1314,28 @@
     ctx.lineTo(fr[0], fr[1]);
     ctx.stroke();
 
-    // 学校の郵便番号（固定データ）
-    envDrawPostalBoxes(ctx, toPx, faceScale, mmToPx, 48, 65, Array.from(ENVELOPE_SCHOOL_POSTAL));
+    // 差出人情報（学校郵便番号・学校住所・学校名・氏名）は、封筒の
+    // 右半分を余白として残し、左半分にまとまりよく配置する。
+    // 学校の郵便番号は、裏面では7枠ではなく通常の文字列表記にする。
+    envDrawHorizontalText(ctx, toPx, formatPostalDisplay(ENVELOPE_SCHOOL_POSTAL), 12, 72, 5.5, faceScale, mmToPx, false, "left");
 
-    // 学校住所（縦書き、右寄りの列）
-    envChunkText(ENVELOPE_SCHOOL_ADDRESS, 20).forEach(function (chunk, i) {
-      envDrawVerticalColumn(ctx, toPx, chunk, 100 - i * 9, 90, 5.2, 4.2, faceScale, mmToPx, false);
+    // 学校住所（縦書き、差出人情報の中でもっとも右寄りの列）
+    splitAddressIntoColumns(ENVELOPE_SCHOOL_ADDRESS, 20).forEach(function (chunk, i) {
+      envDrawVerticalColumn(ctx, toPx, chunk, 48 - i * 9, 85, 5.2, 4.2, faceScale, mmToPx, false);
     });
 
-    // 学校名（学科・学年は表示しない。中央寄りの列）。1列に収まる
+    // 学校名（学科・学年は表示しない。住所の左隣の列）。1列に収まる
     // 文字数を十分大きくとり、正式名称（19文字）が2列に分かれて
     // 読みにくくならないようにする。
-    var colX = 82;
+    var colX = 35;
     envChunkText(ENVELOPE_SCHOOL_NAME, 24).forEach(function (chunk) {
-      envDrawVerticalColumn(ctx, toPx, chunk, colX, 90, 6.5, 5.2, faceScale, mmToPx, true);
+      envDrawVerticalColumn(ctx, toPx, chunk, colX, 85, 6.5, 5.2, faceScale, mmToPx, true);
       colX -= 8.5;
     });
 
-    // 生徒氏名（画面2で入力した氏名をそのまま使う）
-    envDrawVerticalColumn(ctx, toPx, state.name.trim(), colX - 4, 150, 7.5, 6, faceScale, mmToPx, true);
+    // 生徒氏名（画面2で入力した氏名をそのまま使う。学校名よりさらに
+    // 左・少し下寄りに配置する）
+    envDrawVerticalColumn(ctx, toPx, state.name.trim(), 20, 130, 7.5, 6, faceScale, mmToPx, true);
   }
 
   function drawEnvelopeFace(ctx, mmToPx, originXmm, originYmm, faceScale, kind, label) {
@@ -1200,8 +1362,25 @@
     }
   }
 
-  // A4横向き1枚に「表面」「裏面」を並べて描画する。canvasは画面
-  // プレビュー・印刷・画像保存のすべてで共通のものを使う。
+  // 画面プレビュー用に、表面・裏面のどちらか1面だけを大きく描画する。
+  // 印刷・画像保存で使うdrawEnvelopeSheetとは別のcanvasに描くことで、
+  // 印刷・保存の出力仕様（A4横1枚に表面＋裏面）を変えずに、スマホ
+  // でも文字が読みやすいプレビューを実現する。
+  function drawEnvelopeSingleFace(canvas, kind, scale) {
+    var mmToPx = MM_TO_PX_BASE * scale;
+    var marginMm = 6;
+    var topMarginMm = marginMm + ENVELOPE_LABEL_MM;
+    canvas.width = Math.round((ENVELOPE_W_MM + marginMm * 2) * mmToPx);
+    canvas.height = Math.round((ENVELOPE_H_MM + marginMm + topMarginMm) * mmToPx);
+    var ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    var label = kind === "front" ? "表面" : "裏面";
+    drawEnvelopeFace(ctx, mmToPx, marginMm, topMarginMm, 1, kind, label);
+  }
+
+  // A4横向き1枚に「表面」「裏面」を並べて描画する。canvasは印刷・
+  // 画像保存専用（画面プレビューはdrawEnvelopeSingleFaceを使う）。
   function drawEnvelopeSheet(canvas, scale) {
     var mmToPx = MM_TO_PX_BASE * scale;
     var sheetWmm = 297;
@@ -1240,7 +1419,7 @@
   function renderEnvelope() {
     envelopeCarryCompany.textContent = state.company.trim() || "（未入力）";
     envelopeCarryName.textContent = state.name.trim() || "（未入力）";
-    drawEnvelopeSheet(envelopeCanvas, ENVELOPE_IMAGE_SCALE);
+    drawEnvelopeSingleFace(envelopePreviewCanvas, envelopePreviewFace, ENVELOPE_PREVIEW_SCALE);
   }
 
   /* ---------------- 清書フォームの入力 ---------------- */
