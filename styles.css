@@ -147,6 +147,10 @@ body[data-screen="2"] .screen2 {
   display: block;
 }
 
+body[data-screen="3"] .screen3 {
+  display: block;
+}
+
 .screen-inner {
   text-align: center;
   margin-bottom: 20px;
@@ -421,6 +425,15 @@ textarea:focus, .month-select:focus, input:focus, select:focus {
   filter: brightness(1.08);
 }
 
+.btn-envelope {
+  background: #9c6b30;
+  color: #fff;
+}
+
+.btn-envelope:hover {
+  filter: brightness(1.08);
+}
+
 .worksheet-footer {
   margin-top: 26px;
   display: flex;
@@ -666,6 +679,64 @@ textarea:focus, .month-select:focus, input:focus, select:focus {
   margin-top: 20px;
 }
 
+/* ---------------- 封筒（画面3） ---------------- */
+
+.envelope-carry {
+  max-width: 720px;
+  margin: 0 auto 16px;
+  background: #fff;
+  border: 2px solid var(--border-soft);
+  border-radius: 12px;
+  padding: 12px 16px;
+}
+
+.envelope-carry p {
+  margin: 4px 0;
+  font-size: 1rem;
+}
+
+.envelope-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  max-width: 720px;
+  margin: 0 auto 20px;
+}
+
+@media (max-width: 560px) {
+  .envelope-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+.envelope-form .form-row:nth-child(2) {
+  grid-column: 1 / -1;
+}
+
+.envelope-note {
+  max-width: 720px;
+  margin: 0 auto 16px;
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--text-sub);
+}
+
+.envelope-preview-wrap {
+  max-width: 960px;
+  margin: 0 auto 20px;
+  overflow-x: auto;
+  text-align: center;
+}
+
+#envelope-canvas {
+  max-width: 100%;
+  height: auto;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #ffffff;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+}
+
 /* ---------------- 画像保存の案内モーダル ---------------- */
 
 .modal-overlay {
@@ -808,11 +879,17 @@ textarea:focus, .month-select:focus, input:focus, select:focus {
     display: none !important;
   }
 
-  body[data-screen] .screen1 {
+  body[data-screen] .screen1,
+  body[data-screen] .screen2,
+  body[data-screen] .screen3 {
     display: none !important;
   }
 
-  body[data-screen] .screen2 {
+  body[data-screen="2"] .screen2 {
+    display: block !important;
+  }
+
+  body[data-screen="3"] .screen3 {
     display: block !important;
   }
 
@@ -827,8 +904,34 @@ textarea:focus, .month-select:focus, input:focus, select:focus {
     padding: 0;
   }
 
-  .screen2 {
+  .screen2,
+  .screen3 {
     padding: 0;
+  }
+
+  /* 封筒（画面3）の印刷は、A4横向き1枚にcanvasをそのまま実寸表示
+     するだけでよい。便箋のような複数ページ分割・ダークモード対策は
+     canvas描画そのもの（常に白背景・黒文字で描画）で完結している。
+     用紙の向き（A4横向き）は#dynamic-page-styleへJS側が印刷直前に
+     書き込む（画面2の便箋はA4縦向きのままにするため、@page自体は
+     ここでは変更しない）。 */
+  body[data-screen="3"] .envelope-preview-wrap {
+    display: block !important;
+    overflow: visible !important;
+    max-width: none !important;
+    width: 297mm !important;
+    height: 210mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  body[data-screen="3"] #envelope-canvas {
+    display: block !important;
+    width: 297mm !important;
+    height: 210mm !important;
+    max-width: none !important;
+    border: none !important;
+    box-shadow: none !important;
   }
 
   .paper-wrap,
