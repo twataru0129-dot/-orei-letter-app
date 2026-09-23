@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>お礼状作成サポート</title>
 <link rel="stylesheet" href="styles.css">
+<style id="dynamic-page-style"></style>
 <link rel="apple-touch-icon" href="orei-touch-icon.PNG">
 <link rel="icon" type="image/png" href="orei-touch-icon.PNG">
 </head>
@@ -21,6 +22,11 @@
       <div class="progress-step" id="step-2" data-step="2">
         <span class="progress-num">2</span>
         <span class="progress-text">清書</span>
+      </div>
+      <div class="progress-arrow" aria-hidden="true">→</div>
+      <div class="progress-step" id="step-3" data-step="3">
+        <span class="progress-num">3</span>
+        <span class="progress-text">封筒</span>
       </div>
     </div>
   </header>
@@ -179,10 +185,57 @@
         <button id="back-btn" type="button" class="btn btn-secondary btn-large">もどって直す</button>
         <button id="save-btn" type="button" class="btn btn-save btn-large">画像で保存</button>
         <button id="print-btn" type="button" class="btn btn-primary btn-large">印刷する</button>
+        <button id="goto-envelope-btn" type="button" class="btn btn-envelope btn-large">封筒へ進む</button>
       </div>
 
       <div id="save-error-box" class="error-box save-error-box no-print" hidden role="alert">
         <p id="save-error-text"></p>
+      </div>
+
+    </section>
+
+    <!-- ============ 画面3：封筒 ============ -->
+    <section id="screen3" class="screen screen3">
+
+      <div class="screen-inner no-print">
+        <h2 class="screen-title">封筒を書こう</h2>
+        <p class="screen-lead">実習先の住所を入力して、封筒の見本を作ろう。</p>
+      </div>
+
+      <div class="envelope-carry no-print">
+        <p>実習先：<strong id="envelope-carry-company"></strong></p>
+        <p>氏名：<strong id="envelope-carry-name"></strong></p>
+      </div>
+
+      <div class="envelope-form no-print">
+        <div class="form-row">
+          <label for="input-envelope-postal">実習先の郵便番号 <span class="required">必須</span></label>
+          <input type="text" id="input-envelope-postal" inputmode="numeric" placeholder="（例）338-0000">
+        </div>
+        <div class="form-row">
+          <label for="input-envelope-address">実習先の住所 <span class="required">必須</span></label>
+          <input type="text" id="input-envelope-address" placeholder="（例）埼玉県さいたま市桜区〇〇1-2-3">
+        </div>
+        <div class="form-row">
+          <label for="input-envelope-contact">担当者名（分かる場合のみ）</label>
+          <input type="text" id="input-envelope-contact" placeholder="（例）山田 太郎">
+        </div>
+      </div>
+
+      <div id="envelope-error-box" class="error-box save-error-box no-print" hidden role="alert">
+        <p id="envelope-error-text"></p>
+      </div>
+
+      <p class="envelope-note no-print">この見本は、実際の封筒（長形3号）に手書きするための参考です。この用紙にそのまま宛先を印刷して送ることはできません。</p>
+
+      <div class="envelope-preview-wrap">
+        <canvas id="envelope-canvas"></canvas>
+      </div>
+
+      <div class="letter-actions no-print">
+        <button id="envelope-back-btn" type="button" class="btn btn-secondary btn-large">清書にもどる</button>
+        <button id="envelope-save-btn" type="button" class="btn btn-save btn-large">画像で保存</button>
+        <button id="envelope-print-btn" type="button" class="btn btn-primary btn-large">印刷する</button>
       </div>
 
     </section>

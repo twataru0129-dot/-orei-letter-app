@@ -132,7 +132,10 @@
     company: "",
     date: "",
     grade: "1",
-    name: ""
+    name: "",
+    envelopePostal: "",
+    envelopeAddress: "",
+    envelopeContact: ""
   };
 
   /* ---------------- 要素取得 ---------------- */
@@ -174,6 +177,21 @@
 
   var step1 = $("step-1");
   var step2 = $("step-2");
+  var step3 = $("step-3");
+
+  var gotoEnvelopeBtn = $("goto-envelope-btn");
+  var envelopeCarryCompany = $("envelope-carry-company");
+  var envelopeCarryName = $("envelope-carry-name");
+  var inputEnvelopePostal = $("input-envelope-postal");
+  var inputEnvelopeAddress = $("input-envelope-address");
+  var inputEnvelopeContact = $("input-envelope-contact");
+  var envelopeErrorBox = $("envelope-error-box");
+  var envelopeErrorText = $("envelope-error-text");
+  var envelopeCanvas = $("envelope-canvas");
+  var envelopeBackBtn = $("envelope-back-btn");
+  var envelopeSaveBtn = $("envelope-save-btn");
+  var envelopePrintBtn = $("envelope-print-btn");
+  var dynamicPageStyle = $("dynamic-page-style");
 
   /* ---------------- 月選択の初期化 ---------------- */
 
@@ -326,20 +344,24 @@
   function goToScreen(num) {
     document.body.setAttribute("data-screen", String(num));
 
+    step1.classList.remove("current", "done");
+    step2.classList.remove("current", "done");
+    step3.classList.remove("current", "done");
+
     if (num === 1) {
       step1.classList.add("current");
-      step1.classList.remove("done");
-      step2.classList.remove("current");
-      step2.classList.remove("done");
-    } else {
-      step1.classList.remove("current");
+    } else if (num === 2) {
       step1.classList.add("done");
       step2.classList.add("current");
-      step2.classList.remove("done");
       if (!inputDate.value) {
         inputDate.value = todayISO();
       }
       renderLetter();
+    } else {
+      step1.classList.add("done");
+      step2.classList.add("done");
+      step3.classList.add("current");
+      renderEnvelope();
     }
     window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
   }
@@ -348,10 +370,25 @@
     goToScreen(1);
   });
 
+  gotoEnvelopeBtn.addEventListener("click", function () {
+    if (!state.name.trim()) {
+      showSaveError("封筒を作るために、名前を入力してください。");
+      inputName.focus();
+      return;
+    }
+    hideSaveError();
+    goToScreen(3);
+  });
+
+  envelopeBackBtn.addEventListener("click", function () {
+    goToScreen(2);
+  });
+
   printBtn.addEventListener("click", function () {
     if (!requireCompanyOrShowError()) {
       return;
     }
+    dynamicPageStyle.textContent = "";
     window.print();
   });
 
@@ -388,38 +425,55 @@
 
   var deviceKind = detectDeviceKind();
 
-  function saveGuideText() {
+  // モーダルの案内文・実行内容は「便箋」「封筒」のどちらから開いたかで
+  // 変わるため、直前にどちらのボタンが押されたかをここに覚えておく。
+  var pendingSaveKind = "letter";
+
+  function saveGuideTextFor(kind) {
+    var subject = kind === "envelope" ? "封筒の見本" : "便箋";
     if (deviceKind === "ios") {
-      return (
-        "便箋を画像にして保存します。\n\n" +
+      var iosText =
+        subject + "を画像にして保存します。\n\n" +
         "このあと共有画面が開きます。\n\n" +
-        "「画像を保存」または「”ファイル”に保存」を選んでください。\n\n" +
-        "ページが2枚以上ある場合は、ページごとに画像が用意されます。"
-      );
+        "「画像を保存」または「”ファイル”に保存」を選んでください。";
+      if (kind === "letter") {
+        iosText += "\n\nページが2枚以上ある場合は、ページごとに画像が用意されます。";
+      }
+      return iosText;
     }
-    return (
-      "便箋を画像ファイルとして保存します。\n\n" +
-      "このあと画像のダウンロードが始まります。\n\n" +
-      "ページが2枚以上ある場合は、ページごとに画像が保存されます。\n\n" +
-      "うまく保存できない場合は、続けて表示される画像の一覧からも保存できます。"
-    );
+    var otherText =
+      subject + "を画像ファイルとして保存します。\n\n" +
+      "このあと画像のダウンロードが始まります。\n\n";
+    if (kind === "letter") {
+      otherText += "ページが2枚以上ある場合は、ページごとに画像が保存されます。\n\n";
+    }
+    otherText += "うまく保存できない場合は、続けて表示される画像の一覧からも保存できます。";
+    return otherText;
   }
 
-  function openSaveGuideModal() {
-    if (!requireCompanyOrShowError()) {
+  function openSaveGuideModalFor(kind, requiredCheckFn) {
+    if (requiredCheckFn && !requiredCheckFn()) {
       return;
     }
-    saveGuideBody.textContent = saveGuideText();
+    pendingSaveKind = kind;
+    saveGuideBody.textContent = saveGuideTextFor(kind);
     saveGuideModal.hidden = false;
     saveGuideActionBtn.focus();
   }
 
   function closeSaveGuideModal() {
     saveGuideModal.hidden = true;
-    saveBtn.focus();
+    (pendingSaveKind === "envelope" ? envelopeSaveBtn : saveBtn).focus();
   }
 
-  saveBtn.addEventListener("click", openSaveGuideModal);
+  saveBtn.addEventListener("click", function () {
+    openSaveGuideModalFor("letter", requireCompanyOrShowError);
+  });
+
+  envelopeSaveBtn.addEventListener("click", function () {
+    openSaveGuideModalFor("envelope", requireEnvelopeFieldsOrShowError);
+  });
+
   saveGuideCancelBtn.addEventListener("click", closeSaveGuideModal);
 
   saveGuideModal.addEventListener("click", function (e) {
@@ -441,8 +495,13 @@
   });
 
   saveGuideActionBtn.addEventListener("click", function () {
+    var kind = pendingSaveKind;
     closeSaveGuideModal();
-    saveAsImages();
+    if (kind === "envelope") {
+      saveEnvelopeAsImage();
+    } else {
+      saveAsImages();
+    }
   });
 
   /* ---------------- 保存エラーの表示 ---------------- */
@@ -484,6 +543,70 @@
     if (!saveErrorBox.hidden && saveErrorText.textContent === COMPANY_REQUIRED_MESSAGE && inputCompany.value.trim()) {
       hideSaveError();
     }
+  });
+
+  /* ---------------- 封筒（画面3）のエラー表示・必須チェック ----------------
+     画面3は画面2とは別のセクションなので、エラー表示も専用の
+     #envelope-error-box を使う（画面2の#save-error-boxは画面3が
+     表示されている間は非表示のDOMに隠れてしまうため）。 */
+
+  function showEnvelopeError(message) {
+    envelopeErrorText.textContent = message;
+    envelopeErrorBox.hidden = false;
+    envelopeErrorBox.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  function hideEnvelopeError() {
+    envelopeErrorBox.hidden = true;
+  }
+
+  var ENVELOPE_POSTAL_REQUIRED_MESSAGE = "実習先の郵便番号を入力してください。";
+  var ENVELOPE_ADDRESS_REQUIRED_MESSAGE = "実習先の住所を入力してください。";
+
+  function requireEnvelopeFieldsOrShowError() {
+    if (!inputEnvelopePostal.value.trim()) {
+      showEnvelopeError(ENVELOPE_POSTAL_REQUIRED_MESSAGE);
+      inputEnvelopePostal.focus();
+      return false;
+    }
+    if (!inputEnvelopeAddress.value.trim()) {
+      showEnvelopeError(ENVELOPE_ADDRESS_REQUIRED_MESSAGE);
+      inputEnvelopeAddress.focus();
+      return false;
+    }
+    hideEnvelopeError();
+    return true;
+  }
+
+  function clearEnvelopeErrorIfMatches(message, valueIsFilled) {
+    if (!envelopeErrorBox.hidden && envelopeErrorText.textContent === message && valueIsFilled) {
+      hideEnvelopeError();
+    }
+  }
+
+  inputEnvelopePostal.addEventListener("input", function () {
+    state.envelopePostal = inputEnvelopePostal.value;
+    clearEnvelopeErrorIfMatches(ENVELOPE_POSTAL_REQUIRED_MESSAGE, !!inputEnvelopePostal.value.trim());
+    renderEnvelope();
+  });
+
+  inputEnvelopeAddress.addEventListener("input", function () {
+    state.envelopeAddress = inputEnvelopeAddress.value;
+    clearEnvelopeErrorIfMatches(ENVELOPE_ADDRESS_REQUIRED_MESSAGE, !!inputEnvelopeAddress.value.trim());
+    renderEnvelope();
+  });
+
+  inputEnvelopeContact.addEventListener("input", function () {
+    state.envelopeContact = inputEnvelopeContact.value;
+    renderEnvelope();
+  });
+
+  envelopePrintBtn.addEventListener("click", function () {
+    if (!requireEnvelopeFieldsOrShowError()) {
+      return;
+    }
+    dynamicPageStyle.textContent = "@page { size: A4 landscape; margin: 0; }";
+    window.print();
   });
 
   /* ---------------- 画像で保存（全端末共通） ----------------
@@ -790,59 +913,334 @@
     return chain;
   }
 
-  function saveAsImages() {
-    hideSaveError();
-    var originalLabel = saveBtn.textContent;
-    saveBtn.disabled = true;
-    saveBtn.textContent = "画像を作成中…";
+  // 便箋・封筒どちらの画像保存にも使う共通処理。buildFilesFnはファイル
+  // の配列を返す（同期のPromiseチェーンでもよい）関数、triggerBtnは
+  // 保存中に文字を変える対象のボタン、onErrorは失敗時に呼ぶエラー
+  // 表示関数（画面2/画面3のどちらのエラー表示を使うか呼び出し側が
+  // 決める）。
+  function saveGeneratedImages(buildFilesFn, triggerBtn, onError) {
+    var originalLabel = triggerBtn.textContent;
+    triggerBtn.disabled = true;
+    triggerBtn.textContent = "画像を作成中…";
 
     Promise.resolve()
-      .then(function () {
-        var pages = lastRenderedPages;
-        if (!pages || pages.length === 0) {
-          throw new Error("no letter pages found");
+      .then(buildFilesFn)
+      .then(function (files) {
+        if (!files || files.length === 0) {
+          throw new Error("no files to save");
         }
-
-        var files = [];
-        var chain = Promise.resolve();
-        pages.forEach(function (pageChunks, i) {
-          chain = chain.then(function () {
-            return buildPageImageFile(pageChunks, i + 1, pages.length).then(function (file) {
-              files.push(file);
-            });
+        if (deviceKind === "ios") {
+          // iPhone/iPad：Web Share APIで共有シートを開く。共有が
+          // 使えない・失敗した場合はプレビューにフォールバックする。
+          return tryShareFiles(files).catch(function () {
+            return false;
+          }).then(function (shared) {
+            if (!shared) {
+              showImagePreview(files);
+            }
           });
-        });
-
-        return chain.then(function () {
-          if (deviceKind === "ios") {
-            // iPhone/iPad：Web Share APIで共有シートを開く。共有が
-            // 使えない・失敗した場合はプレビューにフォールバックする。
-            return tryShareFiles(files).catch(function () {
-              return false;
-            }).then(function (shared) {
-              if (!shared) {
-                showImagePreview(files);
-              }
-            });
-          }
-          // PC/Mac/その他：まず自動ダウンロードを試み、そのうえで
-          // 確認・手動保存の手段としてプレビューも表示する。
-          return downloadFiles(files).catch(function () {
-            // ダウンロード自体は失敗を検知できないため、ここに
-            // 来るのは想定外のエラー時のみ。プレビュー表示は
-            // 下の.then()で必ず行われる。
-          }).then(function () {
-            showImagePreview(files);
-          });
+        }
+        // PC/Mac/その他：まず自動ダウンロードを試み、そのうえで
+        // 確認・手動保存の手段としてプレビューも表示する。
+        return downloadFiles(files).catch(function () {
+          // ダウンロード自体は失敗を検知できないため、ここに
+          // 来るのは想定外のエラー時のみ。プレビュー表示は
+          // 下の.then()で必ず行われる。
+        }).then(function () {
+          showImagePreview(files);
         });
       })
       .catch(function () {
-        showSaveError("画像の保存に失敗しました。もう一度お試しください。");
+        onError("画像の保存に失敗しました。もう一度お試しください。");
       })
       .then(function () {
-        saveBtn.disabled = false;
-        saveBtn.textContent = originalLabel;
+        triggerBtn.disabled = false;
+        triggerBtn.textContent = originalLabel;
       });
+  }
+
+  function saveAsImages() {
+    hideSaveError();
+    saveGeneratedImages(function () {
+      var pages = lastRenderedPages;
+      if (!pages || pages.length === 0) {
+        throw new Error("no letter pages found");
+      }
+      var files = [];
+      var chain = Promise.resolve();
+      pages.forEach(function (pageChunks, i) {
+        chain = chain.then(function () {
+          return buildPageImageFile(pageChunks, i + 1, pages.length).then(function (file) {
+            files.push(file);
+          });
+        });
+      });
+      return chain.then(function () {
+        return files;
+      });
+    }, saveBtn, showSaveError);
+  }
+
+  function saveEnvelopeAsImage() {
+    hideEnvelopeError();
+    saveGeneratedImages(function () {
+      drawEnvelopeSheet(envelopeCanvas, ENVELOPE_IMAGE_SCALE);
+      return canvasToPngBlob(envelopeCanvas).then(function (blob) {
+        return [new File([blob], buildEnvelopeFilenameBase() + ".png", { type: "image/png" })];
+      });
+    }, envelopeSaveBtn, showEnvelopeError);
+  }
+
+  /* ---------------- 封筒の見本（v1.1で追加） ----------------
+     長形3号（120mm×235mm）を基準に、A4横向き1枚へ「表面」「裏面」
+     を並べた見本を作成する。実際の封筒へ直接印刷するものではなく、
+     生徒がこの見本を見ながら手書きするための参考。
+
+     画面プレビュー・印刷・画像保存のすべてで同じ<canvas>（1つの
+     要素）をそのまま使う。理由：便箋の画像保存で分かったとおり、
+     DOMをSVGのforeignObject経由でcanvas化する方式はtainted canvas
+     になり使えないため、封筒も文字・枠線をcanvasへ直接描画する
+     しかない。それなら最初から「画面表示用のcanvas」と「保存用の
+     canvas」を分けず、同じcanvasを常に保存/印刷にそのまま使う方が、
+     見た目のズレが起きようがなく、実装も単純になる。印刷時は
+     このcanvasをCSSでA4横向きの実寸（297mm×210mm）に表示するだけ。
+     外部ライブラリ・CDNは使用していない。 */
+
+  var ENVELOPE_W_MM = 120;
+  var ENVELOPE_H_MM = 235;
+  var ENVELOPE_SHEET_MARGIN_MM = 10;
+  var ENVELOPE_LABEL_MM = 12;
+  var ENVELOPE_GAP_MM = 14;
+  var ENVELOPE_IMAGE_SCALE = 3; // 印刷見本として使えるよう高解像度で描画する
+
+  // 学校の固定情報（封筒裏面用）。お礼状清書で使っている学校名
+  // 「さいたま桜高等学園」とは別に、封筒裏面では正式な学校名を使う
+  // よう指定されているため、専用の定数として持つ。
+  var ENVELOPE_SCHOOL_POSTAL = "3380824"; // 〒338-0824
+  var ENVELOPE_SCHOOL_ADDRESS = "埼玉県さいたま市桜区上大久保519-7";
+  var ENVELOPE_SCHOOL_NAME = "埼玉県立特別支援学校さいたま桜高等学園";
+
+  // 文章を最大maxChars文字ごとのかたまりに分割する（便箋のchunkText
+  // と同じ考え方だが、列の文字数が便箋とは異なるため専用に用意する）。
+  function envChunkText(text, maxChars) {
+    var chars = text ? Array.from(text) : [];
+    if (chars.length === 0) {
+      return [""];
+    }
+    var chunks = [];
+    for (var i = 0; i < chars.length; i += maxChars) {
+      chunks.push(chars.slice(i, i + maxChars).join(""));
+    }
+    return chunks;
+  }
+
+  // 縦書きで1文字描画する。text-orientation: mixed の縦書きで90度
+  // 回転して縦線として表示される文字（長音符・カッコ類）と、セルの
+  // 中央ではなく右上寄りに描かれる句読点は、便箋の画像描画と同じ
+  // ROTATE_VERTICAL_CHARS / SHIFT_PUNCT_CHARS を再利用する。
+  function envDrawChar(ctx, ch, centerX, cellTop, cellPitch, fontSizePx) {
+    if (ch === " " || ch === "　") {
+      return;
+    }
+    var cellCenterY = cellTop + cellPitch / 2;
+    if (ROTATE_VERTICAL_CHARS[ch]) {
+      ctx.save();
+      ctx.translate(centerX, cellCenterY);
+      ctx.rotate(Math.PI / 2);
+      ctx.fillText(ch, 0, 0);
+      ctx.restore();
+    } else if (SHIFT_PUNCT_CHARS[ch]) {
+      ctx.fillText(ch, centerX + fontSizePx * 0.28, cellTop + fontSizePx * 0.38);
+    } else {
+      ctx.fillText(ch, centerX, cellCenterY);
+    }
+  }
+
+  // 封筒内のローカルmm座標（0..120, 0..235）で1列ぶんの縦書き文字列
+  // を描画する。toPxはそのローカル座標をシート全体のpx座標へ変換する
+  // 関数（drawEnvelopeFaceが用意する）。
+  function envDrawVerticalColumn(ctx, toPx, text, centerXLocal, topYLocal, charPitchLocalMm, fontSizeLocalMm, faceScale, mmToPx, bold) {
+    var fontPx = fontSizeLocalMm * faceScale * mmToPx;
+    ctx.font = (bold ? "bold " : "") + fontPx + "px " + SAVE_FONT_FAMILY;
+    ctx.fillStyle = "#000000";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    Array.from(text).forEach(function (ch, i) {
+      var top = toPx(centerXLocal, topYLocal + i * charPitchLocalMm);
+      var bottom = toPx(centerXLocal, topYLocal + (i + 1) * charPitchLocalMm);
+      envDrawChar(ctx, ch, top[0], top[1], bottom[1] - top[1], fontPx);
+    });
+  }
+
+  // 郵便番号の枠（3桁＋4桁、計7マス）を描画する。startXLocal/startYLocal
+  // はローカルmm座標。digitsは1文字ずつの配列（足りない分は空欄）。
+  function envDrawPostalBoxes(ctx, toPx, faceScale, mmToPx, startXLocal, startYLocal, digits) {
+    var boxW = 7;
+    var boxH = 9;
+    var gap = 1.5;
+    var groupGap = 3;
+    var x = startXLocal;
+    for (var i = 0; i < 7; i++) {
+      if (i === 3) {
+        x += groupGap;
+      }
+      var p0 = toPx(x, startYLocal);
+      var p1 = toPx(x + boxW, startYLocal + boxH);
+      ctx.strokeStyle = "#999999";
+      ctx.lineWidth = Math.max(1, mmToPx * 0.15);
+      ctx.strokeRect(p0[0], p0[1], p1[0] - p0[0], p1[1] - p0[1]);
+      if (digits[i]) {
+        ctx.fillStyle = "#000000";
+        ctx.font = (5.5 * faceScale * mmToPx) + "px " + SAVE_FONT_FAMILY;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(digits[i], (p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2);
+      }
+      x += boxW + gap;
+    }
+  }
+
+  function envelopePostalDigits(rawValue) {
+    return Array.from((rawValue || "").replace(/[^0-9]/g, "").slice(0, 7));
+  }
+
+  function drawEnvelopeFrontFace(ctx, toPx, faceScale, mmToPx) {
+    // 切手を貼る場所（左上）。料金は改定されるため表示しない。
+    var sp0 = toPx(10, 10);
+    var sp1 = toPx(35, 35);
+    ctx.strokeStyle = "#999999";
+    ctx.lineWidth = Math.max(1, mmToPx * 0.15);
+    ctx.setLineDash([mmToPx * faceScale * 1.2, mmToPx * faceScale * 1.2]);
+    ctx.strokeRect(sp0[0], sp0[1], sp1[0] - sp0[0], sp1[1] - sp0[1]);
+    ctx.setLineDash([]);
+    ctx.fillStyle = "#888888";
+    ctx.font = (3.2 * faceScale * mmToPx) + "px " + SAVE_FONT_FAMILY;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    var stampCenter = toPx(22.5, 22.5);
+    ctx.fillText("切手", stampCenter[0], stampCenter[1]);
+
+    // 実習先の郵便番号
+    envDrawPostalBoxes(ctx, toPx, faceScale, mmToPx, 48, 16, envelopePostalDigits(state.envelopePostal));
+
+    // 実習先の住所（縦書き、右寄りの列。長い場合は左隣の列へ続ける）
+    var addressChunks = envChunkText(state.envelopeAddress.trim(), 20);
+    addressChunks.forEach(function (chunk, i) {
+      envDrawVerticalColumn(ctx, toPx, chunk, 100 - i * 9, 45, 5.2, 4.2, faceScale, mmToPx, false);
+    });
+
+    // 会社名・宛名（縦書き、住所より大きい文字。中央寄りの列）
+    var contact = state.envelopeContact.trim();
+    var company = state.company.trim();
+    var segments = contact ? [company, contact + "　様"] : [company, "御中"];
+    var colX = 78;
+    segments.forEach(function (seg) {
+      envChunkText(seg, 14).forEach(function (chunk) {
+        envDrawVerticalColumn(ctx, toPx, chunk, colX, 55, 7.8, 6.4, faceScale, mmToPx, true);
+        colX -= 10;
+      });
+    });
+  }
+
+  function drawEnvelopeBackFace(ctx, toPx, faceScale, mmToPx) {
+    // 封筒中央の継ぎ目・フラップを見本として分かる程度の線で表現する。
+    ctx.strokeStyle = "#cccccc";
+    ctx.lineWidth = Math.max(1, mmToPx * 0.12);
+    ctx.beginPath();
+    var fl = toPx(0, 0);
+    var fr = toPx(120, 0);
+    var fc = toPx(60, 55);
+    ctx.moveTo(fl[0], fl[1]);
+    ctx.lineTo(fc[0], fc[1]);
+    ctx.lineTo(fr[0], fr[1]);
+    ctx.stroke();
+
+    // 学校の郵便番号（固定データ）
+    envDrawPostalBoxes(ctx, toPx, faceScale, mmToPx, 48, 65, Array.from(ENVELOPE_SCHOOL_POSTAL));
+
+    // 学校住所（縦書き、右寄りの列）
+    envChunkText(ENVELOPE_SCHOOL_ADDRESS, 20).forEach(function (chunk, i) {
+      envDrawVerticalColumn(ctx, toPx, chunk, 100 - i * 9, 90, 5.2, 4.2, faceScale, mmToPx, false);
+    });
+
+    // 学校名（学科・学年は表示しない。中央寄りの列）。1列に収まる
+    // 文字数を十分大きくとり、正式名称（19文字）が2列に分かれて
+    // 読みにくくならないようにする。
+    var colX = 82;
+    envChunkText(ENVELOPE_SCHOOL_NAME, 24).forEach(function (chunk) {
+      envDrawVerticalColumn(ctx, toPx, chunk, colX, 90, 6.5, 5.2, faceScale, mmToPx, true);
+      colX -= 8.5;
+    });
+
+    // 生徒氏名（画面2で入力した氏名をそのまま使う）
+    envDrawVerticalColumn(ctx, toPx, state.name.trim(), colX - 4, 150, 7.5, 6, faceScale, mmToPx, true);
+  }
+
+  function drawEnvelopeFace(ctx, mmToPx, originXmm, originYmm, faceScale, kind, label) {
+    function toPx(xLocal, yLocal) {
+      return [(originXmm + xLocal * faceScale) * mmToPx, (originYmm + yLocal * faceScale) * mmToPx];
+    }
+
+    ctx.fillStyle = "#000000";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+    ctx.font = "bold " + (6 * mmToPx) + "px " + SAVE_FONT_FAMILY;
+    ctx.fillText(label, (originXmm + ENVELOPE_W_MM * faceScale / 2) * mmToPx, (originYmm - 3) * mmToPx);
+
+    var p0 = toPx(0, 0);
+    var p1 = toPx(ENVELOPE_W_MM, ENVELOPE_H_MM);
+    ctx.strokeStyle = "#999999";
+    ctx.lineWidth = Math.max(1, mmToPx * 0.2);
+    ctx.strokeRect(p0[0], p0[1], p1[0] - p0[0], p1[1] - p0[1]);
+
+    if (kind === "front") {
+      drawEnvelopeFrontFace(ctx, toPx, faceScale, mmToPx);
+    } else {
+      drawEnvelopeBackFace(ctx, toPx, faceScale, mmToPx);
+    }
+  }
+
+  // A4横向き1枚に「表面」「裏面」を並べて描画する。canvasは画面
+  // プレビュー・印刷・画像保存のすべてで共通のものを使う。
+  function drawEnvelopeSheet(canvas, scale) {
+    var mmToPx = MM_TO_PX_BASE * scale;
+    var sheetWmm = 297;
+    var sheetHmm = 210;
+    canvas.width = Math.round(sheetWmm * mmToPx);
+    canvas.height = Math.round(sheetHmm * mmToPx);
+    var ctx = canvas.getContext("2d");
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    var availH = sheetHmm - ENVELOPE_SHEET_MARGIN_MM * 2 - ENVELOPE_LABEL_MM;
+    var envScale = availH / ENVELOPE_H_MM;
+    var envWmm = ENVELOPE_W_MM * envScale;
+    var totalWmm = envWmm * 2 + ENVELOPE_GAP_MM;
+    var startXmm = (sheetWmm - totalWmm) / 2;
+    var startYmm = ENVELOPE_SHEET_MARGIN_MM + ENVELOPE_LABEL_MM;
+
+    drawEnvelopeFace(ctx, mmToPx, startXmm, startYmm, envScale, "front", "表面");
+    drawEnvelopeFace(ctx, mmToPx, startXmm + envWmm + ENVELOPE_GAP_MM, startYmm, envScale, "back", "裏面");
+  }
+
+  function buildEnvelopeFilenameBase() {
+    var namePart = state.name.trim().replace(/\s+/g, "");
+    var datePart = state.date ? state.date.replace(/-/g, "") : "";
+    var base = "封筒見本";
+    if (datePart) {
+      base += "_" + datePart;
+    }
+    if (namePart) {
+      base += "_" + namePart;
+    }
+    return base;
+  }
+
+  function renderEnvelope() {
+    envelopeCarryCompany.textContent = state.company.trim() || "（未入力）";
+    envelopeCarryName.textContent = state.name.trim() || "（未入力）";
+    drawEnvelopeSheet(envelopeCanvas, ENVELOPE_IMAGE_SCALE);
   }
 
   /* ---------------- 清書フォームの入力 ---------------- */
