@@ -756,7 +756,13 @@
           ctx.fillText(ch, 0, 0);
           ctx.restore();
         } else if (SHIFT_PUNCT_CHARS[ch]) {
-          ctx.fillText(ch, centerX + fontSizePx * 0.28, cellTop + fontSizePx * 0.38);
+          // 縦書きの句読点は、セルいっぱいの大きさで中央に置くと
+          // 不自然に大きく見えるため、一回り小さく描き、セルの
+          // 右上寄りに寄せる（前の文字に寄り添うような自然な位置）。
+          ctx.save();
+          ctx.font = (isBold ? "bold " : "") + (fontSizePx * 0.6) + "px " + SAVE_FONT_FAMILY;
+          ctx.fillText(ch, centerX + fontSizePx * 0.32, cellTop + fontSizePx * 0.3);
+          ctx.restore();
         } else {
           ctx.fillText(ch, centerX, cellCenterY);
         }
@@ -1095,19 +1101,47 @@
     return chunks;
   }
 
+  // 縦書きの住所表示用に、数字を1文字ずつ漢数字に、ハイフンを
+  // 縦線（｜）に変換する。入力欄の値そのものは変更せず、封筒の
+  // 描画（表示）時だけに使う。郵便番号はこの変換の対象外（別途
+  // formatPostalDisplayで数字のまま横書き表示する）。
+  var KANJI_DIGIT_CHARS = ["〇", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
+
+  function digitToKanji(ch) {
+    var code = ch.charCodeAt(0);
+    if (code >= 0x30 && code <= 0x39) {
+      return KANJI_DIGIT_CHARS[code - 0x30];
+    }
+    if (code >= 0xFF10 && code <= 0xFF19) {
+      return KANJI_DIGIT_CHARS[code - 0xFF10];
+    }
+    return ch;
+  }
+
+  function toVerticalAddressDisplay(text) {
+    return Array.from(text || "").map(function (ch) {
+      if (ch === "-" || ch === "－") {
+        return "｜";
+      }
+      return digitToKanji(ch);
+    }).join("");
+  }
+
   // 住所を列（縦書き）に分割する。envChunkTextのような単純な文字数
-  // 区切りだと「1-2-3」のような数字＋ハイフンの途中や「丁目」
+  // 区切りだと「一-二-三」のような数字＋ハイフンの途中や「丁目」
   // 「番地」の途中で不自然に列が変わったり、最後の列が1文字だけに
   // なったりしてしまう。完璧な住所解析は不要なので、数字・ハイフン
   // の並びや「丁目」「番地」をひとまとまり（アトム）として崩さずに
   // 詰めていく簡易的なロジックで、見た目の自然さだけを改善する。
+  // 表示用に数字を漢数字へ、ハイフンを縦線（｜）へ変換したうえで
+  // 分割するため、戻り値の列はそのまま縦書き描画に使える。
   function splitAddressIntoColumns(text, maxChars) {
-    var chars = text ? Array.from(text) : [];
+    var chars = text ? Array.from(toVerticalAddressDisplay(text)) : [];
     if (chars.length === 0) {
       return [""];
     }
 
-    var NUM_RE = /^[0-9０-９\-－ー]$/;
+    var NUM_RE = /^[〇一二三四五六七八九｜ー]$/;
     var KANA_RE = /^[゠-ヿ]$/;
     var atoms = [];
     var i = 0;
@@ -1183,7 +1217,7 @@
   // 回転して縦線として表示される文字（長音符・カッコ類）と、セルの
   // 中央ではなく右上寄りに描かれる句読点は、便箋の画像描画と同じ
   // ROTATE_VERTICAL_CHARS / SHIFT_PUNCT_CHARS を再利用する。
-  function envDrawChar(ctx, ch, centerX, cellTop, cellPitch, fontSizePx) {
+  function envDrawChar(ctx, ch, centerX, cellTop, cellPitch, fontSizePx, bold) {
     if (ch === " " || ch === "　") {
       return;
     }
@@ -1195,7 +1229,12 @@
       ctx.fillText(ch, 0, 0);
       ctx.restore();
     } else if (SHIFT_PUNCT_CHARS[ch]) {
-      ctx.fillText(ch, centerX + fontSizePx * 0.28, cellTop + fontSizePx * 0.38);
+      // お礼状本文のcanvas描画と同じルールで、句読点は一回り小さく
+      // セルの右上寄りに描く。
+      ctx.save();
+      ctx.font = (bold ? "bold " : "") + (fontSizePx * 0.6) + "px " + SAVE_FONT_FAMILY;
+      ctx.fillText(ch, centerX + fontSizePx * 0.32, cellTop + fontSizePx * 0.3);
+      ctx.restore();
     } else {
       ctx.fillText(ch, centerX, cellCenterY);
     }
@@ -1213,7 +1252,7 @@
     Array.from(text).forEach(function (ch, i) {
       var top = toPx(centerXLocal, topYLocal + i * charPitchLocalMm);
       var bottom = toPx(centerXLocal, topYLocal + (i + 1) * charPitchLocalMm);
-      envDrawChar(ctx, ch, top[0], top[1], bottom[1] - top[1], fontPx);
+      envDrawChar(ctx, ch, top[0], top[1], bottom[1] - top[1], fontPx, bold);
     });
   }
 
@@ -1288,17 +1327,37 @@
     });
 
     // 会社名・宛名（縦書き、住所より大きい文字。住所列との間隔を
-    // 広めに取り、会社名がやや中央寄りに見えるようにする）
+    // 広めに取り、会社名がやや中央寄りに見えるようにする）。
+    // 「御中」「担当者名」「様」は会社名と同じ高さから書き始めるの
+    // ではなく、少しずつ下げて書き始めることで、封筒らしい自然な
+    // 見た目にする（1マス＝文字の縦方向のピッチを基準に下げる）。
     var contact = state.envelopeContact.trim();
     var company = state.company.trim();
-    var segments = contact ? [company, contact + "　様"] : [company, "御中"];
+    var addresseeCellMm = 7.8;
+    var baseYLocal = 55;
     var colX = 65;
-    segments.forEach(function (seg) {
-      envChunkText(seg, 14).forEach(function (chunk) {
-        envDrawVerticalColumn(ctx, toPx, chunk, colX, 55, 7.8, 6.4, faceScale, mmToPx, true);
+
+    // 会社名（右側の列。宛名要素の基準となる高さ）
+    envChunkText(company, 14).forEach(function (chunk) {
+      envDrawVerticalColumn(ctx, toPx, chunk, colX, baseYLocal, addresseeCellMm, 6.4, faceScale, mmToPx, true);
+      colX -= 10;
+    });
+
+    if (contact) {
+      // 担当者名（会社名の左隣。会社名より少し下げて書き始める）
+      var contactYLocal = baseYLocal + addresseeCellMm * 1.5;
+      envChunkText(contact, 14).forEach(function (chunk) {
+        envDrawVerticalColumn(ctx, toPx, chunk, colX, contactYLocal, addresseeCellMm, 6.4, faceScale, mmToPx, true);
         colX -= 10;
       });
-    });
+      // 様（担当者名のさらに左隣。担当者名よりさらに少し下げる）
+      var samaYLocal = contactYLocal + addresseeCellMm;
+      envDrawVerticalColumn(ctx, toPx, "様", colX, samaYLocal, addresseeCellMm, 6.4, faceScale, mmToPx, true);
+    } else {
+      // 御中（会社名の左隣。会社名より少し下げて書き始める）
+      var chudoYLocal = baseYLocal + addresseeCellMm * 2;
+      envDrawVerticalColumn(ctx, toPx, "御中", colX, chudoYLocal, addresseeCellMm, 6.4, faceScale, mmToPx, true);
+    }
   }
 
   function drawEnvelopeBackFace(ctx, toPx, faceScale, mmToPx) {
