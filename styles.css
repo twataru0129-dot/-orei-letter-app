@@ -67,6 +67,35 @@ body {
   z-index: 10;
 }
 
+/* 現在のアプリバージョンを画面右上へ小さく表示する（v1.2.1）。
+   表示専用の情報であり、操作（タップ・クリック・リンク等）は一切
+   持たせない。値はJS側でAPP_VERSIONから自動的に設定する。 */
+.app-version-badge {
+  position: absolute;
+  top: calc(10px + env(safe-area-inset-top, 0px));
+  right: calc(10px + env(safe-area-inset-right, 0px));
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #f3faf7;
+  border: 1px solid var(--accent);
+  color: var(--accent-dark);
+  font-size: 0.7rem;
+  font-weight: bold;
+  line-height: 1.4;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+  cursor: default;
+}
+
+@media (max-width: 420px) {
+  .app-version-badge {
+    font-size: 0.6rem;
+    padding: 2px 8px;
+  }
+}
+
 .app-title {
   margin: 0 0 12px;
   font-size: 1.4rem;
@@ -535,6 +564,30 @@ textarea:focus, .month-select:focus, input:focus, select:focus {
   font-size: 1.1rem;
   font-weight: bold;
   white-space: nowrap;
+}
+
+/* 姓・名の2欄（v1.2.1）。幅が十分あるときは横並び、狭い端末では
+   縦並びにして、スマートフォンでも入力しやすくする。 */
+.name-input-pair {
+  display: flex;
+  gap: 16px;
+}
+
+.name-input-item {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.name-input-item label {
+  display: block;
+  font-weight: bold;
+  margin-bottom: 6px;
+}
+
+@media (max-width: 420px) {
+  .name-input-pair {
+    flex-direction: column;
+  }
 }
 
 .required {

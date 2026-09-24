@@ -12,6 +12,7 @@
 <body data-screen="1">
 <div class="app">
   <header class="app-header no-print">
+    <span id="app-version-badge" class="app-version-badge"></span>
     <h1 class="app-title">お礼状作成サポート</h1>
     <div class="progress" id="progress">
       <div class="progress-step" id="step-1" data-step="1">
@@ -186,9 +187,18 @@
             <option value="3">3年</option>
           </select>
         </div>
-        <div class="form-row">
-          <label for="input-name">名前</label>
-          <input type="text" id="input-name" placeholder="（例）埼玉　太郎">
+        <div class="form-row form-row-full">
+          <span class="form-row-legend">名前</span>
+          <div class="name-input-pair">
+            <div class="name-input-item">
+              <label for="input-last-name">姓 <span class="required">必須</span></label>
+              <input type="text" id="input-last-name" placeholder="（例）田川">
+            </div>
+            <div class="name-input-item">
+              <label for="input-first-name">名 <span class="required">必須</span></label>
+              <input type="text" id="input-first-name" placeholder="（例）渉">
+            </div>
+          </div>
         </div>
       </div>
 
