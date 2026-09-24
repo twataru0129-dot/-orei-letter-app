@@ -7,6 +7,11 @@
 (function () {
   "use strict";
 
+  // アプリのバージョンは、ここ1か所だけで管理する。画面右上の
+  // バージョンバッジは、このAPP_VERSIONから自動的に生成する
+  // （HTMLへ"v1.2.1"のような文字列を直接書き込まない）。
+  var APP_VERSION = "1.2.1";
+
   /* ---------------- 固定の文章データ（変更禁止） ---------------- */
 
   var JIKOU = {
@@ -132,7 +137,8 @@
     company: "",
     date: "",
     grade: "1",
-    name: "",
+    lastName: "",
+    firstName: "",
     recipientType: "company", // "company" | "person"
     recipientPersonName: "",
     envelopePostal: "",
@@ -142,6 +148,23 @@
     // 場合だけ、新しい検索結果で無条件に上書きする。
     envelopeAddressAutoFilled: ""
   };
+
+  // 氏名の組み立てはここだけで行う（表示用・ファイル名用の2種類）。
+  // 姓・名のどちらかしか入力されていない場合は、その一方だけを返す
+  // （まだ入力途中のプレビューでも不自然な余白が出ないようにする）。
+  function getDisplayName() {
+    var lastName = state.lastName.trim();
+    var firstName = state.firstName.trim();
+    if (lastName && firstName) {
+      return lastName + "　" + firstName;
+    }
+    return lastName + firstName;
+  }
+
+  // ファイル名用は姓と名の間にスペースを入れない（例：「田川渉」）。
+  function getFilenameName() {
+    return state.lastName.trim() + state.firstName.trim();
+  }
 
   /* ---------------- 要素取得 ---------------- */
 
@@ -162,7 +185,8 @@
   var companyHint = $("company-hint");
   var inputDate = $("input-date");
   var inputGrade = $("input-grade");
-  var inputName = $("input-name");
+  var inputLastName = $("input-last-name");
+  var inputFirstName = $("input-first-name");
   var inputRecipientTypeCompany = $("input-recipient-type-company");
   var inputRecipientTypePerson = $("input-recipient-type-person");
   var recipientPersonRow = $("recipient-person-row");
@@ -190,6 +214,7 @@
   var step1 = $("step-1");
   var step2 = $("step-2");
   var step3 = $("step-3");
+  var appVersionBadge = $("app-version-badge");
 
   var gotoEnvelopeBtn = $("goto-envelope-btn");
   var envelopeCarryCompany = $("envelope-carry-company");
@@ -395,7 +420,8 @@
   gotoEnvelopeBtn.addEventListener("click", function () {
     var companyMissing = !state.company.trim();
     var personMissing = state.recipientType === "person" && !state.recipientPersonName.trim();
-    var nameMissing = !state.name.trim();
+    var lastNameMissing = !state.lastName.trim();
+    var firstNameMissing = !state.firstName.trim();
 
     var missingLabels = [];
     if (companyMissing) {
@@ -404,8 +430,11 @@
     if (personMissing) {
       missingLabels.push("担当者名");
     }
-    if (nameMissing) {
-      missingLabels.push("名前");
+    if (lastNameMissing) {
+      missingLabels.push("姓");
+    }
+    if (firstNameMissing) {
+      missingLabels.push("名");
     }
 
     if (missingLabels.length > 0) {
@@ -414,8 +443,10 @@
         inputCompany.focus();
       } else if (personMissing) {
         inputRecipientPersonName.focus();
+      } else if (lastNameMissing) {
+        inputLastName.focus();
       } else {
-        inputName.focus();
+        inputFirstName.focus();
       }
       return;
     }
@@ -996,7 +1027,7 @@
   }
 
   function buildImageFilenameBase(pageNum, totalPages) {
-    var namePart = state.name.trim().replace(/\s+/g, "");
+    var namePart = getFilenameName();
     var datePart = state.date ? state.date.replace(/-/g, "") : "";
     var base = "お礼状";
     if (datePart) {
@@ -1560,11 +1591,14 @@
 
     // 会社名・宛名（縦書き、住所より大きい文字。住所列との間隔を
     // 広めに取り、会社名がやや中央寄りに見えるようにする）。
-    // 会社あて：会社名の左隣に「御中」。個人あて：会社名の左隣に
-    // 「担当者名＋様」を1つの列にまとめて表示する（担当者名と様を
-    // 別々の列に分けない）。どちらも会社名と同じ高さから書き始める
-    // のではなく、少し下げて書き始めることで封筒らしい自然な見た目
-    // にする（1マス＝文字の縦方向のピッチを基準に下げる）。
+    // 会社あて：会社名と「御中」を、全角スペースを挟んで同じ1列の
+    // 中に連続して表示する（会社名を書いたあと少し空けて御中、と
+    // いう実際の手書き見本として分かりやすくするため）。
+    // 個人あて：会社名の列とは別に、その左隣の列へ「担当者名＋様」
+    // を1つの列にまとめて表示する（担当者名と様を別々の列に分け
+    // ない）。会社名と同じ高さから書き始めるのではなく、少し下げて
+    // 書き始めることで封筒らしい自然な見た目にする（1マス＝文字の
+    // 縦方向のピッチを基準に下げる）。
     var isPersonRecipient = state.recipientType === "person";
     var personName = state.recipientPersonName.trim();
     var company = state.company.trim();
@@ -1572,13 +1606,12 @@
     var baseYLocal = 55;
     var colX = 65;
 
-    // 会社名（右側の列。宛名要素の基準となる高さ）
-    envChunkText(company, 14).forEach(function (chunk) {
-      envDrawVerticalColumn(ctx, toPx, chunk, colX, baseYLocal, addresseeCellMm, 6.4, faceScale, mmToPx, true);
-      colX -= 10;
-    });
-
     if (isPersonRecipient) {
+      // 会社名（右側の列。宛名要素の基準となる高さ）
+      envChunkText(company, 14).forEach(function (chunk) {
+        envDrawVerticalColumn(ctx, toPx, chunk, colX, baseYLocal, addresseeCellMm, 6.4, faceScale, mmToPx, true);
+        colX -= 10;
+      });
       // 担当者名＋様（会社名の左隣。同じ列の中に連続して表示し、
       // 会社名より少し下げて書き始める）
       var personYLocal = baseYLocal + addresseeCellMm * 1.5;
@@ -1588,9 +1621,14 @@
         colX -= 10;
       });
     } else {
-      // 御中（会社名の左隣。会社名より少し下げて書き始める）
-      var chudoYLocal = baseYLocal + addresseeCellMm * 2;
-      envDrawVerticalColumn(ctx, toPx, "御中", colX, chudoYLocal, addresseeCellMm, 6.4, faceScale, mmToPx, true);
+      // 会社名＋御中（同じ1列の中に連続して表示。間に全角スペース
+      // 2文字分の空白を挟む。通常の会社名の長さでも1列に収まる
+      // よう、会社名だけの場合より広めの文字数まで許容する）
+      var companyLine = company + "　　御中";
+      envChunkText(companyLine, 20).forEach(function (chunk) {
+        envDrawVerticalColumn(ctx, toPx, chunk, colX, baseYLocal, addresseeCellMm, 6.4, faceScale, mmToPx, true);
+        colX -= 10;
+      });
     }
   }
 
@@ -1626,9 +1664,9 @@
       colX -= 8.5;
     });
 
-    // 生徒氏名（画面2で入力した氏名をそのまま使う。学校名よりさらに
-    // 左・少し下寄りに配置する）
-    envDrawVerticalColumn(ctx, toPx, state.name.trim(), 20, 130, 7.5, 6, faceScale, mmToPx, true);
+    // 生徒氏名（画面2で入力した姓・名から組み立てる。学校名よりさら
+    // に左・少し下寄りに配置する）
+    envDrawVerticalColumn(ctx, toPx, getDisplayName(), 20, 130, 7.5, 6, faceScale, mmToPx, true);
   }
 
   function drawEnvelopeFace(ctx, mmToPx, originXmm, originYmm, faceScale, kind, label) {
@@ -1697,7 +1735,7 @@
   }
 
   function buildEnvelopeFilenameBase() {
-    var namePart = state.name.trim().replace(/\s+/g, "");
+    var namePart = getFilenameName();
     var datePart = state.date ? state.date.replace(/-/g, "") : "";
     var base = "封筒見本";
     if (datePart) {
@@ -1711,7 +1749,7 @@
 
   function renderEnvelope() {
     envelopeCarryCompany.textContent = state.company.trim() || "（未入力）";
-    envelopeCarryName.textContent = state.name.trim() || "（未入力）";
+    envelopeCarryName.textContent = getDisplayName() || "（未入力）";
     if (state.recipientType === "person") {
       envelopeCarrySuffixCompany.hidden = true;
       envelopeCarryPersonRow.hidden = false;
@@ -1748,8 +1786,13 @@
     renderLetter();
   });
 
-  inputName.addEventListener("input", function () {
-    state.name = inputName.value;
+  inputLastName.addEventListener("input", function () {
+    state.lastName = inputLastName.value;
+    renderLetter();
+  });
+
+  inputFirstName.addEventListener("input", function () {
+    state.firstName = inputFirstName.value;
     renderLetter();
   });
 
@@ -2041,7 +2084,7 @@
     var gradeKanji = numberToKanji(Number(state.grade) || 1) + "年";
     var deptGradeText = "家政技術科" + gradeKanji;
     var schoolInfoText = schoolText + "　" + deptGradeText;
-    var nameText = state.name.trim();
+    var nameText = getDisplayName();
     var companyText = state.company.trim();
     var recipientText = "";
     if (state.recipientType === "person") {
@@ -2134,6 +2177,7 @@
 
   /* ---------------- 初期化 ---------------- */
 
+  appVersionBadge.textContent = "v" + APP_VERSION;
   inputDate.value = todayISO();
   state.date = inputDate.value;
   goToScreen(1);
