@@ -136,7 +136,11 @@
     recipientType: "company", // "company" | "person"
     recipientPersonName: "",
     envelopePostal: "",
-    envelopeAddress: ""
+    envelopeAddress: "",
+    // 郵便番号から自動入力された最後の住所（アプリ側が書き込んだ値）。
+    // 住所欄の現在値がこれと一致する（＝生徒がまだ手を加えていない）
+    // 場合だけ、新しい検索結果で無条件に上書きする。
+    envelopeAddressAutoFilled: ""
   };
 
   /* ---------------- 要素取得 ---------------- */
@@ -195,6 +199,10 @@
   var envelopeCarryName = $("envelope-carry-name");
   var inputEnvelopePostal = $("input-envelope-postal");
   var inputEnvelopeAddress = $("input-envelope-address");
+  var postalLookupStatus = $("postal-lookup-status");
+  var addressLookupMessage = $("address-lookup-message");
+  var addressCandidateList = $("address-candidate-list");
+  var addressApplyBtn = $("address-apply-btn");
   var envelopeErrorBox = $("envelope-error-box");
   var envelopeErrorText = $("envelope-error-text");
   var envelopeCanvas = $("envelope-canvas");
@@ -375,6 +383,7 @@
       step2.classList.add("done");
       step3.classList.add("current");
       renderEnvelope();
+      ensurePostalDataLoaded();
     }
     window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
   }
@@ -618,10 +627,194 @@
     }
   }
 
+  /* ---------------- 郵便番号から住所を自動入力（v1.2） ----------------
+     日本郵便が公式に配布している郵便番号データ（住所の郵便番号＋
+     事業所の個別郵便番号）を、あらかじめ検索用に変換した
+     postal-data.json（同じGitHub Pages内の静的ファイル）から読み込み、
+     ブラウザ内だけで検索する。郵便番号そのものや検索結果を外部へ
+     送信することは一切ない（fetchするのは自分自身と同じ配布物の
+     静的ファイル1つだけ）。データの作り方はscripts/build-postal-data.py
+     と README.md「郵便番号データの更新方法」を参照。 */
+
+  var postalData = null;
+  var postalDataLoadState = "idle"; // "idle" | "loading" | "loaded" | "failed"
+  var postalDataLoadPromise = null;
+  var lastSearchedPostalDigits = "";
+
+  function normalizePostalDigits(value) {
+    return (value || "").replace(/[^0-9]/g, "");
+  }
+
+  function setPostalLookupStatus(text) {
+    if (!text) {
+      postalLookupStatus.hidden = true;
+      postalLookupStatus.textContent = "";
+      return;
+    }
+    postalLookupStatus.hidden = false;
+    postalLookupStatus.textContent = text;
+  }
+
+  function ensurePostalDataLoaded() {
+    if (postalDataLoadPromise) {
+      return postalDataLoadPromise;
+    }
+    postalDataLoadState = "loading";
+    setPostalLookupStatus("住所データを読み込んでいます…");
+    postalDataLoadPromise = fetch("postal-data.json")
+      .then(function (res) {
+        if (!res.ok) {
+          throw new Error("postal-data.json HTTP " + res.status);
+        }
+        return res.json();
+      })
+      .then(function (data) {
+        postalData = data;
+        postalDataLoadState = "loaded";
+        setPostalLookupStatus("");
+        maybeSearchPostal();
+      })
+      .catch(function () {
+        postalDataLoadState = "failed";
+        setPostalLookupStatus("住所の自動入力を利用できません。住所を手入力してください。");
+      });
+    return postalDataLoadPromise;
+  }
+
+  function clearAddressLookupUI() {
+    addressLookupMessage.hidden = true;
+    addressLookupMessage.textContent = "";
+    addressLookupMessage.className = "form-hint address-lookup-message";
+    addressCandidateList.hidden = true;
+    addressCandidateList.innerHTML = "";
+    addressApplyBtn.hidden = true;
+    addressApplyBtn.onclick = null;
+  }
+
+  function showAddressLookupMessage(text, kind) {
+    addressLookupMessage.textContent = text;
+    addressLookupMessage.hidden = false;
+    addressLookupMessage.className = "form-hint address-lookup-message" + (kind ? " is-" + kind : "");
+  }
+
+  function buildAutoFillMessage(candidate) {
+    var msg = "郵便番号から住所を自動入力しました。番地・建物名などを続けて入力してください。";
+    if (candidate.type === "office" && candidate.company) {
+      msg += "（この郵便番号は" + candidate.company + "の個別郵便番号です。）";
+    }
+    return msg;
+  }
+
+  function candidateLabel(candidate) {
+    if (candidate.type === "office" && candidate.company) {
+      return candidate.company + "　" + candidate.address;
+    }
+    return candidate.address;
+  }
+
+  // 郵便番号検索結果を住所欄へ反映する。会社名欄（画面2で入力済み）
+  // は、事業所の個別郵便番号であっても書き換えない。
+  function fillAddressFromCandidate(candidate) {
+    inputEnvelopeAddress.value = candidate.address;
+    state.envelopeAddress = candidate.address;
+    state.envelopeAddressAutoFilled = candidate.address;
+    clearEnvelopeErrorIfMatches(ENVELOPE_ADDRESS_REQUIRED_MESSAGE, true);
+    renderEnvelope();
+  }
+
+  function showAddressCandidatePicker(candidates) {
+    showAddressLookupMessage("住所を選んでください。", "info");
+    addressCandidateList.innerHTML = "";
+    candidates.forEach(function (candidate) {
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "address-candidate-btn";
+      btn.textContent = candidateLabel(candidate);
+      btn.addEventListener("click", function () {
+        fillAddressFromCandidate(candidate);
+        showAddressLookupMessage(buildAutoFillMessage(candidate), "success");
+        addressCandidateList.hidden = true;
+        addressCandidateList.innerHTML = "";
+      });
+      addressCandidateList.appendChild(btn);
+    });
+    addressCandidateList.hidden = false;
+  }
+
+  // 候補が1件だけの場合：住所欄が空、またはアプリが直前に自動入力した
+  // 値のままであれば、そのまま自動入力する。生徒がすでに手を加えて
+  // いる場合は、勝手に上書きせず「住所に反映」ボタンで選べるようにする。
+  function applyOrOfferSingleCandidate(candidate) {
+    var current = inputEnvelopeAddress.value.trim();
+    var isSafeToAutoFill = current === "" || current === state.envelopeAddressAutoFilled.trim();
+    if (isSafeToAutoFill) {
+      fillAddressFromCandidate(candidate);
+      showAddressLookupMessage(buildAutoFillMessage(candidate), "success");
+      return;
+    }
+    showAddressLookupMessage("郵便番号から住所が見つかりました。", "info");
+    addressApplyBtn.hidden = false;
+    addressApplyBtn.onclick = function () {
+      fillAddressFromCandidate(candidate);
+      showAddressLookupMessage(buildAutoFillMessage(candidate), "success");
+      addressApplyBtn.hidden = true;
+    };
+  }
+
+  function performPostalLookup(digits) {
+    clearAddressLookupUI();
+    var candidates = postalData[digits];
+    if (!candidates || candidates.length === 0) {
+      showAddressLookupMessage("住所が見つかりませんでした。郵便番号を確認してください。住所はそのまま手入力することもできます。", "muted");
+      return;
+    }
+    if (candidates.length === 1) {
+      applyOrOfferSingleCandidate(candidates[0]);
+      return;
+    }
+    showAddressCandidatePicker(candidates);
+  }
+
+  // 郵便番号欄が数字7桁そろった時点で自動検索する（ボタン操作は不要）。
+  function maybeSearchPostal() {
+    var digits = normalizePostalDigits(inputEnvelopePostal.value);
+    if (digits.length !== 7) {
+      lastSearchedPostalDigits = "";
+      clearAddressLookupUI();
+      return;
+    }
+    if (digits === lastSearchedPostalDigits) {
+      return;
+    }
+    lastSearchedPostalDigits = digits;
+    if (postalDataLoadState !== "loaded") {
+      return;
+    }
+    performPostalLookup(digits);
+  }
+
+  // 「3300856」のように数字だけで7桁入力された場合、カーソルが末尾に
+  // あるときだけ「330-0856」の形へ整形する。ハイフンを含む入力や
+  // 途中編集には手を加えない（無理な整形よりも検索できることを優先）。
+  function maybeAutoFormatPostalInput() {
+    var raw = inputEnvelopePostal.value;
+    var caretAtEnd = inputEnvelopePostal.selectionStart === raw.length &&
+      inputEnvelopePostal.selectionEnd === raw.length;
+    if (!caretAtEnd) {
+      return;
+    }
+    if (/^[0-9]{4,7}$/.test(raw)) {
+      inputEnvelopePostal.value = raw.slice(0, 3) + "-" + raw.slice(3);
+    }
+  }
+
   inputEnvelopePostal.addEventListener("input", function () {
+    maybeAutoFormatPostalInput();
     state.envelopePostal = inputEnvelopePostal.value;
     clearEnvelopeErrorIfMatches(ENVELOPE_POSTAL_REQUIRED_MESSAGE, !!inputEnvelopePostal.value.trim());
     renderEnvelope();
+    ensurePostalDataLoaded();
+    maybeSearchPostal();
   });
 
   inputEnvelopeAddress.addEventListener("input", function () {

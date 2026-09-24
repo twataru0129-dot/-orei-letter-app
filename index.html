@@ -247,10 +247,14 @@
         <div class="form-row">
           <label for="input-envelope-postal">実習先の郵便番号 <span class="required">必須</span></label>
           <input type="text" id="input-envelope-postal" inputmode="numeric" placeholder="（例）338-0000">
+          <p id="postal-lookup-status" class="form-hint" hidden></p>
         </div>
         <div class="form-row">
           <label for="input-envelope-address">実習先の住所 <span class="required">必須</span></label>
           <input type="text" id="input-envelope-address" placeholder="（例）埼玉県さいたま市桜区〇〇1-2-3">
+          <p id="address-lookup-message" class="form-hint address-lookup-message" hidden></p>
+          <div id="address-candidate-list" class="address-candidate-list" hidden></div>
+          <button type="button" id="address-apply-btn" class="btn btn-secondary" hidden>住所に反映</button>
         </div>
       </div>
 
