@@ -811,6 +811,57 @@ textarea:focus, .month-select:focus, input:focus, select:focus {
   color: var(--text-sub);
 }
 
+/* 郵便番号からの住所自動入力（v1.2）に関する案内表示 */
+.address-lookup-message {
+  font-weight: bold;
+}
+
+.address-lookup-message.is-success {
+  color: var(--accent-dark);
+}
+
+.address-lookup-message.is-muted {
+  color: var(--text-sub);
+  font-weight: normal;
+}
+
+.address-candidate-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.address-candidate-btn {
+  text-align: left;
+  font-size: 0.95rem;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 2px solid var(--accent);
+  background: #fff;
+  color: var(--accent-dark);
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.address-candidate-btn:hover {
+  background: #eef6f3;
+}
+
+#address-apply-btn {
+  margin-top: 8px;
+  min-height: 44px;
+  padding: 8px 20px;
+  font-size: 0.95rem;
+}
+
+/* .btnの`display: inline-flex`はauthorスタイルのため、UAの
+   `[hidden]{display:none}`より優先されてしまう（同程度の詳細度では
+   author側が勝つ）。hidden属性のときは確実に非表示にする。 */
+#address-apply-btn[hidden] {
+  display: none;
+}
+
 /* キーボード表示中でも、今どの欄を触っているか分かりやすいように、
    フォーカスされた入力欄がスマホでも見える位置までスクロールできる
    よう余白を確保しておく（sticky headerの高さぶん）。 */
