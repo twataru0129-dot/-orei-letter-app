@@ -10,7 +10,7 @@
   // アプリのバージョンは、ここ1か所だけで管理する。画面右上の
   // バージョンバッジは、このAPP_VERSIONから自動的に生成する
   // （HTMLへ"v1.2.1"のような文字列を直接書き込まない）。
-  var APP_VERSION = "1.2.2";
+  var APP_VERSION = "1.3.0";
 
   /* ---------------- 固定の文章データ（変更禁止） ---------------- */
 
@@ -118,22 +118,66 @@
 
   var FIXED = {
     tougo: "拝啓",
-    orei: "先日は、現場実習で大変お世話になり、ありがとうございました。",
-    korekara: "今回学んだことを、これからの学校生活にも生かしていきたいと思います。",
     kekkugo: "敬具"
+  };
+
+  /* ---------------- お礼状の種類ごとの基本文（v1.3.0） ----------------
+     ③お礼・⑥これからの基本文、④の説明文・書き出しは、お礼状の種類
+     （state.letterPurpose）に応じて切り替える。値そのものは固定文章
+     データであり、生徒が編集した内容（state.item3Text／item6Text）
+     とは別に保持する。 */
+
+  var THANKS_BASE = {
+    internship: "先日は、現場実習で大変お世話になり、ありがとうございました。",
+    workplaceVisit: "先日は、職場見学の際に大変お世話になり、ありがとうございました。",
+    other: "先日は、大変お世話になり、ありがとうございました。"
+  };
+
+  var FUTURE_BASE = {
+    internship: "今回学んだことを、これからの学校生活にも生かしていきたいと思います。",
+    workplaceVisit: "今回の見学で学んだことを、これからの学校生活や進路選択に生かしていきたいと思います。",
+    other: "今回学んだことを、これからに生かしていきたいと思います。"
+  };
+
+  var ITEM4_DESC = {
+    internship: "実習で取り組んだ仕事や、印象に残った出来事を書こう",
+    workplaceVisit: "見学で見たり聞いたりしたことや、印象に残ったことを書こう",
+    other: "印象に残った出来事や、取り組んだことを書こう"
+  };
+
+  var ITEM4_PREFIX = {
+    internship: "実習では、",
+    workplaceVisit: "見学では、",
+    other: "今回は、"
   };
 
   /* ---------------- アプリの状態（メモリ上のみ／保存しない） ---------------- */
 
   var state = {
+    // お礼状の種類（v1.3.0）。"internship" | "workplaceVisit" | "other"。
+    // ③⑥の基本文、④の説明文・書き出しの切り替えに使う。封筒（会社名・
+    // 住所など）には一切影響させない。
+    letterPurpose: "internship",
     jikouMonth: "",
     jikouPart: "", // "first" | "second"
     jikouText: "",
     // ②を生徒が直接操作したらtrueにする。trueになったあとは、⑦側の
     // 操作による自動連動で②を上書きしない（v1.2.2）。
     jikouManuallyChanged: false,
+    // ③お礼の現在の文章（基本文 or 生徒が編集した文章）。
+    item3Text: THANKS_BASE.internship,
+    // 生徒が実際に文章を書き換えたらtrueにする。trueの間は、お礼状の
+    // 種類を変更しても基本文で上書きしない（v1.3.0）。
+    item3Edited: false,
+    // ③が編集可能な表示（textarea）になっているかどうか。「その他」
+    // を選んでいる間は常にtrue（v1.3.0）。
+    item3Editing: false,
     item4: "",
     item5: "",
+    // ⑥これからの現在の文章（③と同じ考え方）。
+    item6Text: FUTURE_BASE.internship,
+    item6Edited: false,
+    item6Editing: false,
     musubiMonth: "",
     musubiPart: "",
     musubiText: "",
@@ -176,6 +220,23 @@
 
   var $ = function (id) { return document.getElementById(id); };
 
+  var purposeButtons = {
+    internship: $("purpose-btn-internship"),
+    workplaceVisit: $("purpose-btn-workplace-visit"),
+    other: $("purpose-btn-other")
+  };
+  var item3FixedText = $("item3-fixed-text");
+  var item3Textarea = $("item3-textarea");
+  var item3Note = $("item3-note");
+  var item3EditBtn = $("item3-edit-btn");
+  var item3ResetBtn = $("item3-reset-btn");
+  var item4Desc = $("item4-desc");
+  var item4Prefix = $("item4-prefix");
+  var item6FixedText = $("item6-fixed-text");
+  var item6Textarea = $("item6-textarea");
+  var item6Note = $("item6-note");
+  var item6EditBtn = $("item6-edit-btn");
+  var item6ResetBtn = $("item6-reset-btn");
   var monthSelect2 = $("month-select-2");
   var monthSelect7 = $("month-select-7");
   var cards2 = $("cards-2");
@@ -262,6 +323,132 @@
 
   fillMonthOptions(monthSelect2);
   fillMonthOptions(monthSelect7);
+
+  /* ---------------- お礼状の種類／③⑥の編集UI（v1.3.0） ----------------
+     ③お礼・⑥これからは、選択した「お礼状の種類」に応じた基本文を
+     表示しつつ、「文章を変更する」で生徒が自由に書き換えられる。
+     生徒が実際に書き換えた（＝xxxEdited）あとは、お礼状の種類を
+     変更しても、その文章を勝手に上書きしない。まだ書き換えていない
+     場合だけ、種類の変更に合わせて基本文を自動的に切り替える。
+     「その他」は用途を1つに決められないため、最初から編集可能な
+     状態（xxxEditing = true）にする。 */
+
+  function renderPurposeButtons() {
+    Object.keys(purposeButtons).forEach(function (key) {
+      var btn = purposeButtons[key];
+      var active = state.letterPurpose === key;
+      btn.classList.toggle("active", active);
+      btn.setAttribute("aria-checked", active ? "true" : "false");
+    });
+  }
+
+  function renderItem3() {
+    if (state.item3Editing) {
+      item3FixedText.hidden = true;
+      item3Textarea.hidden = false;
+      if (item3Textarea.value !== state.item3Text) {
+        item3Textarea.value = state.item3Text;
+      }
+      item3Note.textContent = "自由に書き直せます。「基本文に戻す」でもとの文章に戻せます。";
+      item3EditBtn.hidden = true;
+      item3ResetBtn.hidden = false;
+    } else {
+      item3FixedText.hidden = false;
+      item3FixedText.textContent = state.item3Text;
+      item3Textarea.hidden = true;
+      item3Note.textContent = "基本の文章です。必要な場合は変更できます。";
+      item3EditBtn.hidden = false;
+      item3ResetBtn.hidden = true;
+    }
+  }
+
+  function renderItem6() {
+    if (state.item6Editing) {
+      item6FixedText.hidden = true;
+      item6Textarea.hidden = false;
+      if (item6Textarea.value !== state.item6Text) {
+        item6Textarea.value = state.item6Text;
+      }
+      item6Note.textContent = "自由に書き直せます。「基本文に戻す」でもとの文章に戻せます。";
+      item6EditBtn.hidden = true;
+      item6ResetBtn.hidden = false;
+    } else {
+      item6FixedText.hidden = false;
+      item6FixedText.textContent = state.item6Text;
+      item6Textarea.hidden = true;
+      item6Note.textContent = "基本の文章です。必要な場合は変更できます。";
+      item6EditBtn.hidden = false;
+      item6ResetBtn.hidden = true;
+    }
+  }
+
+  function renderItem4Labels() {
+    item4Desc.textContent = ITEM4_DESC[state.letterPurpose];
+    item4Prefix.textContent = ITEM4_PREFIX[state.letterPurpose];
+  }
+
+  function applyLetterPurpose(newPurpose) {
+    state.letterPurpose = newPurpose;
+
+    if (!state.item3Edited) {
+      state.item3Text = THANKS_BASE[newPurpose];
+      state.item3Editing = newPurpose === "other";
+    }
+    if (!state.item6Edited) {
+      state.item6Text = FUTURE_BASE[newPurpose];
+      state.item6Editing = newPurpose === "other";
+    }
+
+    renderPurposeButtons();
+    renderItem3();
+    renderItem6();
+    renderItem4Labels();
+  }
+
+  Object.keys(purposeButtons).forEach(function (key) {
+    purposeButtons[key].addEventListener("click", function () {
+      if (state.letterPurpose === key) {
+        return;
+      }
+      applyLetterPurpose(key);
+    });
+  });
+
+  item3EditBtn.addEventListener("click", function () {
+    state.item3Editing = true;
+    renderItem3();
+    item3Textarea.focus();
+  });
+
+  item3Textarea.addEventListener("input", function () {
+    state.item3Text = item3Textarea.value;
+    state.item3Edited = true;
+  });
+
+  item3ResetBtn.addEventListener("click", function () {
+    state.item3Text = THANKS_BASE[state.letterPurpose];
+    state.item3Edited = false;
+    state.item3Editing = state.letterPurpose === "other";
+    renderItem3();
+  });
+
+  item6EditBtn.addEventListener("click", function () {
+    state.item6Editing = true;
+    renderItem6();
+    item6Textarea.focus();
+  });
+
+  item6Textarea.addEventListener("input", function () {
+    state.item6Text = item6Textarea.value;
+    state.item6Edited = true;
+  });
+
+  item6ResetBtn.addEventListener("click", function () {
+    state.item6Text = FUTURE_BASE[state.letterPurpose];
+    state.item6Edited = false;
+    state.item6Editing = state.letterPurpose === "other";
+    renderItem6();
+  });
 
   /* ---------------- カード（前半・後半）の描画 ---------------- */
 
@@ -416,11 +603,17 @@
     if (!state.jikouText) {
       missing.push("② 時候の挨拶が選ばれていません。月を選んで、文章をタップしましょう。");
     }
+    if (!state.item3Text.trim()) {
+      missing.push("③ お礼の文章を入力してください。");
+    }
     if (!state.item4.trim()) {
       missing.push("④ 具体的な出来事がまだ書かれていません。実習の内容を書きましょう。");
     }
     if (!state.item5.trim()) {
       missing.push("⑤ 心に残ったこと／学んだことがまだ書かれていません。");
+    }
+    if (!state.item6Text.trim()) {
+      missing.push("⑥ これからの文章を入力してください。");
     }
     if (!state.musubiText) {
       missing.push("⑦ 結びの挨拶が選ばれていません。月を選んで、文章をタップしましょう。");
@@ -1976,19 +2169,22 @@
 
   function buildMainSegments() {
     var jikou = state.jikouText || "";
+    var item4Prefix = ITEM4_PREFIX[state.letterPurpose] || ITEM4_PREFIX.internship;
     var item4Text = state.item4.trim();
     var item5Text = state.item5.trim();
     var musubi = state.musubiText || "";
 
     // 各要素が新しい段落として独立した列から始まるよう、先頭に
     // 全角スペース（一字下げ）を入れている。⑤は生徒が書いた
-    // 文章をそのまま使い、前後に文章を書き足さない。
+    // 文章をそのまま使い、前後に文章を書き足さない。③⑥は、画面1で
+    // 最終的に表示・編集されていた文章（state.item3Text／item6Text）
+    // をそのまま使う（v1.3.0）。
     return [
       FIXED.tougo + "　" + jikou,
-      "　" + FIXED.orei,
-      "　実習では、" + item4Text,
+      "　" + state.item3Text.trim(),
+      "　" + item4Prefix + item4Text,
       "　" + item5Text,
-      "　" + FIXED.korekara,
+      "　" + state.item6Text.trim(),
       "　それでは、" + musubi
     ];
   }
@@ -2229,6 +2425,10 @@
   /* ---------------- 初期化 ---------------- */
 
   appVersionBadge.textContent = "v" + APP_VERSION;
+  renderPurposeButtons();
+  renderItem3();
+  renderItem6();
+  renderItem4Labels();
   inputDate.value = todayISO();
   state.date = inputDate.value;
   goToScreen(1);

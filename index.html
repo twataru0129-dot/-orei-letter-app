@@ -42,6 +42,15 @@
         <p class="screen-lead">①から⑧まで、順番に完成させよう！</p>
       </div>
 
+      <div class="worksheet-purpose no-print">
+        <p class="worksheet-purpose-label">お礼状の種類</p>
+        <div class="purpose-choice" role="radiogroup" aria-label="お礼状の種類">
+          <button type="button" class="purpose-btn active" id="purpose-btn-internship" data-purpose="internship" role="radio" aria-checked="true">現場実習</button>
+          <button type="button" class="purpose-btn" id="purpose-btn-workplace-visit" data-purpose="workplaceVisit" role="radio" aria-checked="false">職場見学</button>
+          <button type="button" class="purpose-btn" id="purpose-btn-other" data-purpose="other" role="radio" aria-checked="false">その他</button>
+        </div>
+      </div>
+
       <div class="worksheet no-print">
 
         <!-- ① 頭語 -->
@@ -69,18 +78,23 @@
         <div class="item item-3">
           <div class="item-label">③ お礼</div>
           <div class="item-body">
-            <div class="fixed-text">先日は、現場実習で大変お世話になり、ありがとうございました。</div>
-            <p class="item-note">ここは変更できません。</p>
+            <div class="fixed-text" id="item3-fixed-text">先日は、現場実習で大変お世話になり、ありがとうございました。</div>
+            <textarea id="item3-textarea" rows="3" hidden></textarea>
+            <p class="item-note" id="item3-note">基本の文章です。必要な場合は変更できます。</p>
+            <div class="item-edit-actions">
+              <button type="button" id="item3-edit-btn" class="item-edit-btn">文章を変更する</button>
+              <button type="button" id="item3-reset-btn" class="item-edit-btn" hidden>基本文に戻す</button>
+            </div>
           </div>
         </div>
 
         <!-- ④ 具体的な出来事 -->
         <div class="item item-4">
           <div class="item-label">④ 具体的な出来事</div>
-          <div class="item-desc">実習で取り組んだ仕事や、印象に残った出来事を書こう</div>
+          <div class="item-desc" id="item4-desc">実習で取り組んだ仕事や、印象に残った出来事を書こう</div>
           <div class="item-body">
             <div class="sentence-row">
-              <span class="fixed-fragment">実習では、</span>
+              <span class="fixed-fragment" id="item4-prefix">実習では、</span>
               <textarea id="input-4" rows="3" placeholder="（例）商品の品出しや、棚の整理をしました。"></textarea>
             </div>
           </div>
@@ -105,8 +119,13 @@
         <div class="item item-6">
           <div class="item-label">⑥ これから</div>
           <div class="item-body">
-            <div class="fixed-text">今回学んだことを、これからの学校生活にも生かしていきたいと思います。</div>
-            <p class="item-note">ここは変更できません。</p>
+            <div class="fixed-text" id="item6-fixed-text">今回学んだことを、これからの学校生活にも生かしていきたいと思います。</div>
+            <textarea id="item6-textarea" rows="3" hidden></textarea>
+            <p class="item-note" id="item6-note">基本の文章です。必要な場合は変更できます。</p>
+            <div class="item-edit-actions">
+              <button type="button" id="item6-edit-btn" class="item-edit-btn">文章を変更する</button>
+              <button type="button" id="item6-reset-btn" class="item-edit-btn" hidden>基本文に戻す</button>
+            </div>
           </div>
         </div>
 
