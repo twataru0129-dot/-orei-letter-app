@@ -10,7 +10,7 @@
   // アプリのバージョンは、ここ1か所だけで管理する。画面右上の
   // バージョンバッジは、このAPP_VERSIONから自動的に生成する
   // （HTMLへ"v1.2.1"のような文字列を直接書き込まない）。
-  var APP_VERSION = "1.2.1";
+  var APP_VERSION = "1.2.2";
 
   /* ---------------- 固定の文章データ（変更禁止） ---------------- */
 
@@ -129,11 +129,17 @@
     jikouMonth: "",
     jikouPart: "", // "first" | "second"
     jikouText: "",
+    // ②を生徒が直接操作したらtrueにする。trueになったあとは、⑦側の
+    // 操作による自動連動で②を上書きしない（v1.2.2）。
+    jikouManuallyChanged: false,
     item4: "",
     item5: "",
     musubiMonth: "",
     musubiPart: "",
     musubiText: "",
+    // ⑦を生徒が直接操作したらtrueにする。trueになったあとは、②側の
+    // 操作による自動連動で⑦を上書きしない（v1.2.2）。
+    musubiManuallyChanged: false,
     company: "",
     date: "",
     grade: "1",
@@ -295,12 +301,29 @@
     });
   }
 
+  /* ---------------- ②時候の挨拶／⑦結びの挨拶の連動（v1.2.2） ----------------
+     生徒が同じ時期を2回選ばなくて済むよう、②⑦のどちらを先に操作
+     しても、もう片方（月・前半／後半）へ自動的に反映する。ただし
+     「最初の入力を補助する」ための連動であり、一度でも生徒が直接
+     操作した側は、以後もう片方からの自動反映で上書きしない
+     （state.jikouManuallyChanged / musubiManuallyChanged で判定）。
+     イベントを発火させずstate・DOMを直接更新して伝えるだけなので、
+     ②→⑦→②……のような相互更新ループは起こらない。 */
+
   function renderCards2() {
     renderCards(cards2, JIKOU, state.jikouMonth, state.jikouPart, function (part, text) {
       state.jikouPart = part;
       state.jikouText = text;
+      state.jikouManuallyChanged = true;
       renderCards2();
       preview2.textContent = "選択中：" + text;
+
+      if (!state.musubiManuallyChanged && state.musubiMonth) {
+        state.musubiPart = part;
+        state.musubiText = MUSUBI[Number(state.musubiMonth)][part];
+        renderCards7();
+        preview7.textContent = "選択中：" + state.musubiText;
+      }
     });
   }
 
@@ -308,8 +331,16 @@
     renderCards(cards7, MUSUBI, state.musubiMonth, state.musubiPart, function (part, text) {
       state.musubiPart = part;
       state.musubiText = text;
+      state.musubiManuallyChanged = true;
       renderCards7();
       preview7.textContent = "選択中：" + text;
+
+      if (!state.jikouManuallyChanged && state.jikouMonth) {
+        state.jikouPart = part;
+        state.jikouText = JIKOU[Number(state.jikouMonth)][part];
+        renderCards2();
+        preview2.textContent = "選択中：" + state.jikouText;
+      }
     });
   }
 
@@ -317,16 +348,36 @@
     state.jikouMonth = monthSelect2.value;
     state.jikouPart = "";
     state.jikouText = "";
+    state.jikouManuallyChanged = true;
     preview2.textContent = "";
     renderCards2();
+
+    if (!state.musubiManuallyChanged) {
+      state.musubiMonth = state.jikouMonth;
+      state.musubiPart = "";
+      state.musubiText = "";
+      monthSelect7.value = state.musubiMonth;
+      preview7.textContent = "";
+      renderCards7();
+    }
   });
 
   monthSelect7.addEventListener("change", function () {
     state.musubiMonth = monthSelect7.value;
     state.musubiPart = "";
     state.musubiText = "";
+    state.musubiManuallyChanged = true;
     preview7.textContent = "";
     renderCards7();
+
+    if (!state.jikouManuallyChanged) {
+      state.jikouMonth = state.musubiMonth;
+      state.jikouPart = "";
+      state.jikouText = "";
+      monthSelect2.value = state.jikouMonth;
+      preview2.textContent = "";
+      renderCards2();
+    }
   });
 
   input4.addEventListener("input", function () {
