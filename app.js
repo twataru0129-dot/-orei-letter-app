@@ -10,7 +10,7 @@
   // アプリのバージョンは、ここ1か所だけで管理する。画面右上の
   // バージョンバッジは、このAPP_VERSIONから自動的に生成する
   // （HTMLへ"v1.2.1"のような文字列を直接書き込まない）。
-  var APP_VERSION = "1.3.0";
+  var APP_VERSION = "1.3.1";
 
   /* ---------------- 固定の文章データ（変更禁止） ---------------- */
 
@@ -151,6 +151,45 @@
     other: "今回は、"
   };
 
+  // ④入力欄の薄い例文（placeholder）。あくまで入力前の案内であり、
+  // 生徒が入力していない限りstate.item4には一切影響しない。「その他」
+  // は用途が幅広く特定の例文へ誘導しないよう、空文字にして非表示にする。
+  var ITEM4_PLACEHOLDER = {
+    internship: "（例）商品の品出しや、棚の整理をしました。",
+    workplaceVisit: "（例）商品の並べ方や、働いている人の様子を見学しました。",
+    other: ""
+  };
+
+  var ITEM5_DESC = {
+    internship: "実習を通して気付いたことや、学んだことを、文章のはじめから終わりまで自由に書こう",
+    workplaceVisit: "見学を通して気付いたことや、学んだことを、文章のはじめから終わりまで自由に書こう",
+    other: "今回の経験を通して気付いたことや、学んだことを、文章のはじめから終わりまで自由に書こう"
+  };
+
+  // ⑤入力欄の薄い例文（placeholder）。④と同じくあくまで案内で、
+  // state.item5には影響しない。
+  var ITEM5_PLACEHOLDER = {
+    internship: "（例）仕事では、周りの人とコミュニケーションを取ることが大切だと学びました。",
+    workplaceVisit: "（例）仕事では、周りの人と協力することが大切だと分かりました。",
+    other: ""
+  };
+
+  // ⑤下部の「文章の例」。「その他」は特定の状況に誘導しないよう
+  // 空配列にし、見出しごと非表示にする。
+  var ITEM5_EXAMPLES = {
+    internship: [
+      "仕事では、周りの人とコミュニケーションを取ることが大切だと学びました。",
+      "時間を守ることの大切さが分かりました。",
+      "分からないことは、自分から質問することが大切だと思いました。"
+    ],
+    workplaceVisit: [
+      "働いている人が声をかけ合いながら仕事をしていることが印象に残りました。",
+      "仕事では、周りの人と協力することが大切だと分かりました。",
+      "見学を通して、自分の進路について考えることができました。"
+    ],
+    other: []
+  };
+
   /* ---------------- アプリの状態（メモリ上のみ／保存しない） ---------------- */
 
   var state = {
@@ -232,6 +271,9 @@
   var item3ResetBtn = $("item3-reset-btn");
   var item4Desc = $("item4-desc");
   var item4Prefix = $("item4-prefix");
+  var item5Desc = $("item5-desc");
+  var item5Examples = $("item5-examples");
+  var item5ExampleList = $("item5-example-list");
   var item6FixedText = $("item6-fixed-text");
   var item6Textarea = $("item6-textarea");
   var item6Note = $("item6-note");
@@ -385,6 +427,31 @@
   function renderItem4Labels() {
     item4Desc.textContent = ITEM4_DESC[state.letterPurpose];
     item4Prefix.textContent = ITEM4_PREFIX[state.letterPurpose];
+    // placeholderはあくまで入力前の案内であり、input4.valueや
+    // state.item4には一切影響しない（v1.3.1）。
+    input4.placeholder = ITEM4_PLACEHOLDER[state.letterPurpose];
+  }
+
+  // ⑤の説明文・placeholder・下部の文章例を、お礼状の種類に応じて
+  // 切り替える（v1.3.1）。placeholder・文章例はあくまで入力支援用で、
+  // input5.valueやstate.item5には一切影響しない。「その他」は例文が
+  // ない（[]）ため、見出しごとhiddenにして余白を残さない。
+  function renderItem5Labels() {
+    item5Desc.textContent = ITEM5_DESC[state.letterPurpose];
+    input5.placeholder = ITEM5_PLACEHOLDER[state.letterPurpose];
+
+    var examples = ITEM5_EXAMPLES[state.letterPurpose];
+    item5ExampleList.innerHTML = "";
+    if (examples.length > 0) {
+      examples.forEach(function (text) {
+        var li = document.createElement("li");
+        li.textContent = text;
+        item5ExampleList.appendChild(li);
+      });
+      item5Examples.hidden = false;
+    } else {
+      item5Examples.hidden = true;
+    }
   }
 
   function applyLetterPurpose(newPurpose) {
@@ -403,6 +470,7 @@
     renderItem3();
     renderItem6();
     renderItem4Labels();
+    renderItem5Labels();
   }
 
   Object.keys(purposeButtons).forEach(function (key) {
@@ -607,7 +675,7 @@
       missing.push("③ お礼の文章を入力してください。");
     }
     if (!state.item4.trim()) {
-      missing.push("④ 具体的な出来事がまだ書かれていません。実習の内容を書きましょう。");
+      missing.push("④ 具体的な出来事がまだ書かれていません。出来事や印象に残ったことを書きましょう。");
     }
     if (!state.item5.trim()) {
       missing.push("⑤ 心に残ったこと／学んだことがまだ書かれていません。");
@@ -2429,6 +2497,7 @@
   renderItem3();
   renderItem6();
   renderItem4Labels();
+  renderItem5Labels();
   inputDate.value = todayISO();
   state.date = inputDate.value;
   goToScreen(1);
