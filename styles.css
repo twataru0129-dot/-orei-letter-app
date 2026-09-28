@@ -1334,3 +1334,50 @@ textarea:focus, .month-select:focus, input:focus, select:focus {
     -webkit-print-color-adjust: exact;
   }
 }
+
+/* ---------------- 個人情報についての案内（v1.3.2） ----------------
+   ①②③どの画面でも、その画面を一番下までスクロールしたときに見える
+   共通フッターとして表示する（<main>の外、.appの中）。表示専用で、
+   ボタン・リンクなどの操作は持たせない。印刷・PNG（清書・封筒とも）
+   には含めない。 */
+
+.app-footer {
+  margin: 32px 20px 24px;
+  padding: 14px 18px;
+  background: #f3faf7;
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  text-align: center;
+}
+
+.app-footer-title {
+  margin: 0 0 6px;
+  font-weight: bold;
+  font-size: 0.95rem;
+  color: var(--accent-dark);
+}
+
+.app-footer-icon {
+  margin-right: 4px;
+}
+
+.app-footer-text {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: var(--text-sub);
+}
+
+.app-footer-note {
+  margin: 6px 0 0;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--text-sub);
+}
+
+@media (max-width: 420px) {
+  .app-footer {
+    margin: 24px 14px 20px;
+    padding: 12px 14px;
+  }
+}
