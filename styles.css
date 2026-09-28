@@ -1342,7 +1342,8 @@ textarea:focus, .month-select:focus, input:focus, select:focus {
    には含めない。 */
 
 .app-footer {
-  margin: 32px 20px 24px;
+  max-width: 640px;
+  margin: 32px auto 24px;
   padding: 14px 18px;
   background: #f3faf7;
   border: 1px solid var(--accent);
@@ -1351,7 +1352,7 @@ textarea:focus, .month-select:focus, input:focus, select:focus {
 }
 
 .app-footer-title {
-  margin: 0 0 6px;
+  margin: 0 0 8px;
   font-weight: bold;
   font-size: 0.95rem;
   color: var(--accent-dark);
@@ -1361,18 +1362,28 @@ textarea:focus, .month-select:focus, input:focus, select:focus {
   margin-right: 4px;
 }
 
-.app-footer-text {
-  margin: 0;
+/* 本文は見出しと違い左揃えにする。1文＝1<p>とし、文章の途中に
+   手動改行（<br>）は入れず、端末幅に応じてブラウザに自然に
+   折り返させる（v1.3.4）。 */
+.app-footer-body {
+  text-align: left;
+}
+
+.app-footer-body p {
+  margin: 0 0 8px;
   font-size: 0.82rem;
-  line-height: 1.6;
+  line-height: 1.75;
   color: var(--text-sub);
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+
+.app-footer-body p:last-child {
+  margin-bottom: 0;
 }
 
 .app-footer-note {
-  margin: 6px 0 0;
   font-size: 0.75rem;
-  line-height: 1.5;
-  color: var(--text-sub);
 }
 
 @media (max-width: 420px) {
