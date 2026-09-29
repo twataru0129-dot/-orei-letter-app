@@ -10,7 +10,7 @@
   // アプリのバージョンは、ここ1か所だけで管理する。画面右上の
   // バージョンバッジは、このAPP_VERSIONから自動的に生成する
   // （HTMLへ"v1.2.1"のような文字列を直接書き込まない）。
-  var APP_VERSION = "1.3.4";
+  var APP_VERSION = "1.3.5";
 
   /* ---------------- 固定の文章データ（変更禁止） ---------------- */
 
@@ -2279,15 +2279,19 @@
     return chunks;
   }
 
-  var TOP_GAP_CHARS = 2; // 日付・学校情報・宛名は上から2マス空けて書き始める
+  var TOP_GAP_CHARS = 2; // 日付・学校情報は上から2マス空けて書き始める
+  // 宛名（会社名）は、右側の学校情報より1マス上から書き始める
+  // （v1.3.5：学校名の先頭と並べたときのバランス調整）。
+  var RECIPIENT_TOP_GAP_CHARS = 1;
   var KEIGU_BOTTOM_GAP_CHARS = 2; // 敬具は下から2マス空けた位置に書く
   var NAME_BOTTOM_GAP_CHARS = 2; // 氏名の最後の文字は下から2マス空けた位置
 
-  function topOffsetChunks(text, className) {
+  function topOffsetChunks(text, className, topGapChars) {
+    var gapChars = topGapChars === undefined ? TOP_GAP_CHARS : topGapChars;
     return chunkText(text).map(function (c, i) {
       // 2列目以降（同じ項目が25文字を超えて折り返した続き）は
       // 上寄せの空白を繰り返さず、そのまま列の上から続ける。
-      return { text: c, className: className, offsetMm: i === 0 ? TOP_GAP_CHARS * FONT_SIZE_MM : 0 };
+      return { text: c, className: className, offsetMm: i === 0 ? gapChars * FONT_SIZE_MM : 0 };
     });
   }
 
@@ -2319,7 +2323,7 @@
       chunks.push({ text: c, className: "letter-name", offsetMm: offsetMm });
     });
 
-    chunks = chunks.concat(topOffsetChunks(recipientText, "letter-recipient"));
+    chunks = chunks.concat(topOffsetChunks(recipientText, "letter-recipient", RECIPIENT_TOP_GAP_CHARS));
 
     return chunks;
   }
